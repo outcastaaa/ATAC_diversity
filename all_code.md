@@ -8,9 +8,9 @@ mkdir -p /mnt/xuruizhi/brain/sequence/human
 ```
 
 # 2. 下载数据
-
+1. 测序数据
 ```bash
-# mouse 21个
+# mouse 21个，后三个是单端测序
 cd /mnt/xuruizhi/brain/sequence
 cat >MOUSE.list <<EOF
 SRR11179779
@@ -31,8 +31,8 @@ SRR3595211
 SRR3595212
 SRR3595213
 SRR3595214
-SRR13443553
 SRR13443549
+SRR13443553
 SRR13443554
 EOF
 
@@ -46,7 +46,7 @@ rm *.sra
 
 
 
-# rat 12个
+# rat 12个,全是双端测序
 cd /mnt/xuruizhi/brain/sequence
 cat >RAT.list <<EOF
 SRR9050823
@@ -73,7 +73,7 @@ rm *.sra
 # macaque只有peak，无原始文件
 
 
-# human
+# human 本数据库提供的为bam文件，下载了暂且不使用
 cd /mnt/xuruizhi/brain/sequence
 cat >HUMAN.list <<EOF
 SRR5367709
@@ -133,7 +133,33 @@ do
   cp /home/xuruizhi/data/sra/$id.sra /mnt/xuruizhi/brain/sequence/human
   1>log_human.txt 2>&1
 done
+
+# new_human
+
 ```
+2. 基因组数据
+```bash
+hg19：
+    $ cd /your/path/of/reference/
+    $ wget http://hgdownload.cse.ucsc.edu/goldenPath/hg19/bigZips/chromFa.tar.gz
+    $ tar zvfx chromFa.tar.gz
+    $ cat *.fa > hg19.fa
+    $ rm chr*.fa
+建立bwa索引：
+    $ bwa index -a bwtsw  hg19.fa
+    # 产生.bwt .pac .ann .amb .sa五个新文件
+    # -a：两种构建index算法，bwtsw以及is，bwtsw适用大于10MB的参考基因组，比如人，is适用于小于2GB的数据库，是默认的算法，速度较快，需要较大的内存，
+    # -p：输出数据库的前缀，默认与输入文件名一致，这里我没有加这个参数，直接输出到当前目录
+建立bowtie2索引：
+    $ bowtie2-build hg19.fa hg19.fa
+    #  bowtie2-build命令在安装bowtie2的目录下找到
+    # 第一个hg19.fa代表输入的参考序列
+    # 第二个hg19.fa代表输出的索引文件前缀
+    # 产生六个.bt2新文件
+```
+
+
+
 
 # 在超算中转换格式
 ```bash
@@ -241,61 +267,42 @@ do
   bsub -q mpi -n 24 -J sra2fq -o ~/xuruizhi/brain/fastq/$line "sh sra2fq.sh > sra2fq.log"
 done
 ```
-# 3. 
+# 3. 比对前质控
 
-
-# 4. Pre-alinment
-
-## 4.1 quality control checking  
-
-1. 目的：whether the sequencing quality is qualified or not    
-
-2. 使用软件：`FastQC`,  `multiqc`  
-FastQC可用于可视化测序数据中的`碱基质量评分`、`GC含量`、序列长度分布、序列重复水平、k-mer的过度表达，及`引物、接头的污染`。  
-3. 代码
 ```bash
+rsync -av /mnt/xuruizhi/brain/fastq/ \
+wangq@202.119.37.251:/share/home/wangq/xuruizhi/brain/brain/fastq/
+
 # 新建目录  
-mkdir /mnt/d/ATAC/fastqc
+mkdir -p ~/xuruizhi/brain/brain/fastqc/mouse
 
 # ！注意！一定在存储fastq.gz的文件夹路径下执行下面的命令
-cd ~/data/sra
-fastqc -t 4 -o /mnt/d/ATAC/fastqc/ *.gz
-
-cd /mnt/d/ATAC/fastqc/
-multiqc .
+cd ~/xuruizhi/brain/brain/fastq/mouse/
+bsub -q mpi -n 24 -J fastqc -o ~/xuruizhi/brain/brain/fastqc/mouse " \
+fastqc -t 4 -o ~/xuruizhi/brain/brain/fastqc/mouse/ *.gz"
+# job <8592824>
 ```
-4. 结果解读：分析看[该文章](https://github.com/outcastaaa/bioinformatics-learning/blob/main/RNA-seq/Tools/fastqc.md)  
 
-可看到，四个样本拆分得到的8个测序数据：   
-
-`sequence quality`都很高，前期因为使用默认参数进行base calling, 所以这部分碱基的质量一般有些较低也不影响，下一步trim掉即可；  
-`Per base sequence content`前期波动，后期都很平稳。使用转座酶片段化的文库在读取开始位置都有内在偏差。这种偏差与绝对序列无关，而是在读数的 5' 末端提供了许多不同 K-mer 的富集。 虽然这是一个真正的技术偏差，但它不可以通过trimming来纠正的，并且在大多数情况下不会对下游分析产生不利影响。  
-`Per sequence GC content`和上面原因一样，建库偏差导致GC含量和预测不同。
-`Sequence Duplication Levels`更specific的子集富集或低复杂性污染物在图的右侧产生尖峰，蓝线中存在红线中消失，可以被去重。  
-`Adapter Content`报错是因为含有ATAC-seq转座酶序列，后续去接头即可。  
-
-
-
-
-
-
-## 4.2 pre-alinment QC
-1. 目的：adapters and low quality reads trimming
-2. 使用软件：`Trim Galore`，因为在最后一部卡住，选择使用`cutadapt + trimmomatic`分步修剪  [参考1](https://www.jianshu.com/p/4ee2f4d2292f)  
-
-* Trim Galore可以自动检测接头序列，质控和去除接头两个步骤一起,适用于多种组学去接头.  
-3. 代码：  
+* 超算达咩  
 
 ```bash
-mkdir -p /mnt/d/ATAC/trim/
+# 超算下载安装包，发现搞不来在本地跑吧
+cd /mnt/d/biosoft
+wget -c https://files.pythonhosted.org/packages/a3/30/4a889a6916d7480c153774777e634b89865f95cb02f2c3209762c7ef984b/cutadapt-4.1.tar.gz
+tar -zxvf cutadapt-4.1.tar.gz
+cd cutadapt-4.1
+python setup.py install --user
+
+mkdir -p ~/xuruizhi/brain/brain/trim/mouse
+
+# 双端测序
 # 构建循环
-cd ~/data/sra
+cd ~/xuruizhi/brain/brain/fastq/mouse/
 ls ./*_1.fastq.gz > ./1
 ls ./*_2.fastq.gz > ./2
-
 paste 1 1 2 >config.raw
-
 # 执行trim代码，有时候会卡住，要有耐心
+bsub -q mpi -n 24 -J fastqc -o ~/xuruizhi/brain/brain/trim/mouse " \
 cat config.raw | while read id;
 do echo $id 
  arr=($id)
@@ -303,88 +310,144 @@ do echo $id
  fq2=${arr[2]}
  sample=${arr[0]}
 
-trim_galore --phred33 --length 35 -e 0.1 --stringency 3 --paired -o /mnt/d/ATAC/trim/  $fq1 $fq2 &
-done
+~/xuruizhi/biosoft/biosoft/TrimGalore-0.6.6/trim_galore \
+--phred33 --length 35 -e 0.1 --stringency 3 --paired -o ~/xuruizhi/brain/brain/trim/mouse  $fq1 $fq2  --path_to_cutadapt ~/xuruizhi/biosoft/cutadapt-4.1
+done "
 
 #-q 质量；--length 去除长度小于35的reads；-e 允许的最大误差；--paired 双端测序；-o 输出目录；后接 fastq_file1和file2
 
 # 再次质控
-fastqc -t 4 -o /mnt/d/ATAC/fastqc_again/ /mnt/d/ATAC/trim2/*.gz
-cd /mnt/d/ATAC/fastqc_again/
+mkdir -p ~/xuruizhi/brain/brain/fastqc_again/mouse/
+fastqc -t 4 -o ~/xuruizhi/brain/brain/fastqc_again/mouse/ ~/xuruizhi/brain/brain/trim/mouse/*.gz
+cd  ~/xuruizhi/brain/brain/fastqc_again/mouse/
 multiqc .
 ```
-* 或者采用cutadapt + trimmomatic
+* 本地质控  
 ```bash
-# 去接头
-mkdir -p /mnt/d/ATAC/cutadapt/
+# 新建目录  
+mkdir -p /mnt/xuruizhi/brain/fastqc/
+# 通过beyond compare传输到/mnt/d/brain/brain/fastqc/mouse
+cd /mnt/d/brain/brain/fastqc/mouse
+multiqc .
+cp /mnt/d/brain/brain/fastqc/mouse/* /mnt/xuruizhi/brain/fastqc/mouse/
 
+
+mkdir -p /mnt/xuruizhi/brain/trim/mouse
+# 双端测序
 # 构建循环
-cd ~/data/sra
+cd /mnt/xuruizhi/brain/fastq/mouse/
 ls *_1.fastq.gz > 1
-ls *_2.fastq.gz > 2
+sed 's/_1.fastq.gz//g' ./1 >name.list
+# 执行trim代码，有时候会卡住，要有耐心
+cat name.list | parallel --no-run-if-empty --linebuffer -k -j 8 ' \
+trim_galore --phred33 --length 35 -e 0.1 --stringency 3 --paired \
+-o /mnt/xuruizhi/brain/trim/mouse  ./{}_1.fastq.gz ./{}_2.fastq.gz'
+#-q 质量；--length 去除长度小于35的reads；-e 允许的最大误差；--paired 双端测序；-o 输出目录；后接 fastq_file1和file2
 
-paste 1 1 2 >config.raw
-
-# 执行cutadapt代码
-cat config.raw | while read id;
-do echo $id 
- arr=($id)
- fq1=${arr[1]}
- fq2=${arr[2]}
- sample=${arr[0]}
-
-cutadapt -a CTGTCTCTTATA -A CTGTCTCTTATA -j 6\
-    --minimum-length 30 --overlap 3 -e 0.1 --trim-n \
-    -o /mnt/d/ATAC/cutadapt/$fq1 -p /mnt/d/ATAC/cutadapt/$fq2 $fq1 $fq2
+# 单端测序
+cd /mnt/xuruizhi/brain/fastq/mouse
+cat >single.list <<EOF
+SRR13443549.fastq.gz
+SRR13443553.fastq.gz
+SRR13443554.fastq.gz
+EOF
+cat single.list | while read id
+do 
+  trim_galore --phred33 --length 35 -e 0.1 --stringency 3 \
+  -o /mnt/xuruizhi/brain/trim/mouse ${id}
 done
-    # --minimum-length 如果剔除接头后read长度低于30，这条read将会被丢弃
-    # --overlap        如果两端的序列与接头有4个碱基的匹配将会被剔除
-    # --trim-n         剔除两端的N
-    # -a 去除3端引物序列
-    # -e 容错率，默认为0.1
-	# --discard-untrimmed 去除没有adapter的reads，不要乱用
-
-
-# 去低质量reads
-mkdir -p /mnt/d/ATAC/trimmomatic/paired
-mkdir -p /mnt/d/ATAC/trimmomatic/unpaired
-cat config.raw | while read id;
-do echo $id 
- arr=($id)
- fq1=${arr[1]}
- fq2=${arr[2]}
- sample=${arr[0]}
-
- # Trimmomatic-0.38记得更改路径
-    java -jar /mnt/d/biosoft/Trimmomatic-0.38/Trimmomatic-0.38.jar \
-    PE -threads 4 -phred33 /mnt/d/ATAC/cutadapt/$fq1 /mnt/d/ATAC/cutadapt/$fq2 \
-	/mnt/d/ATAC/trimmomatic/paired/$fq1 /mnt/d/ATAC/trimmomatic/unpaired/$fq1 \
-	/mnt/d/ATAC/trimmomatic/paired/$fq2 /mnt/d/ATAC/trimmomatic/unpaired/$fq2 \
-    LEADING:20 TRAILING:20 SLIDINGWINDOW:5:15 MINLEN:30 
-done
-
-  # LEADING:20，从序列的开头开始去掉质量值小于 20 的碱基
-  # TRAILING:20，从序列的末尾开始去掉质量值小于 20 的碱基
-  # SLIDINGWINDOW:5:15，从 5' 端开始以 5bp 的窗口计算碱基平均质量，如果此平均值低于 15，则从这个位置截断read
-  # MINLEN:30， 如果 reads 长度小于 30bp 则扔掉整条 read。
-
 
 # 再次质控
-fastqc -t 4 -o /mnt/d/ATAC/fastqc_again/again  /mnt/d/ATAC/trimmomatic/paired/*.gz
-cd /mnt/d/ATAC/fastqc_again/again
-multiqc . 
+mkdir -p /mnt/xuruizhi/brain/fastqc_again/mouse/
+fastqc -t 6 -o /mnt/xuruizhi/brain/fastqc_again/mouse/ /mnt/xuruizhi/brain/trim/mouse/*.gz
+cd  /mnt/xuruizhi/brain/fastqc_again/mouse/
+multiqc .
+
+# 传到超算
+mkdir -p /share/home/wangq/xuruizhi/brain/brain/trim/
+rsync -av /mnt/xuruizhi/brain/trim/ \
+wangq@202.119.37.251:/share/home/wangq/xuruizhi/brain/brain/trim/
+mkdir -p /share/home/wangq/xuruizhi/brain/brain/fastqc_again/mouse/
+rsync -av /mnt/xuruizhi/brain/fastqc_again/ \
+wangq@202.119.37.251:/share/home/wangq/xuruizhi/brain/brain/fastqc_again/
 ```
- 
-4. 结果：  
-* 储存在[trim_galore](https://github.com/outcastaaa/ATAC/tree/main/trim_galore)和[cutadapt+Trimmomatic](https://github.com/outcastaaa/ATAC/tree/main/cutadapt%2BTrimmomatic)  
+# 4. 比对
 
-* 再次质控结果  
-其他没有合格的板块或不影响下游分析，或可以通过后续步骤解决，这一步成功去除了`Adapter Content`版块的接头序列。
+1. 参考基因组  
+```bash
+# 小鼠 mm10 的 bowtie2 的 index 已经建立过，在超算中处理
+mkdir -p /mnt/xuruizhi/brain/genome/mouse/
+cp /mnt/d/atac/genome/* /mnt/xuruizhi/brain/genome/mouse/
+# 进入超算
+mkdir -p /share/home/wangq/xuruizhi/brain/brain/genome/mouse/
+rsync -av /mnt/d/atac/genome/ \
+wangq@202.119.37.251:/share/home/wangq/xuruizhi/brain/brain/genome/mouse/
+```
+2. 比对，在超算
+```bash
+mkdir -p ~/xuruizhi/brain/brain/alignment/mouse
+# 循环 
+cd ~/xuruizhi/brain/brain/fastq/mouse
+ls *_1.fastq.gz > 1
+sed 's/_1.fastq.gz//g' ./1 >name.list
+cp ~/xuruizhi/brain/brain/fastq/mouse/name.list ~/xuruizhi/brain/brain/trim/mouse/pair.list
+
+cd ~/xuruizhi/brain/brain/trim/mouse/
+ls *_1_val_1.fq.gz > ./1
+ls *_2_val_2.fq.gz > ./2
+paste pair.list 1 2  > name.list
+cat name.list
+# SRR11179779
+# SRR11179780
+# SRR11179781
+# SRR13049359
+# SRR13049360
+# SRR13049361
+# SRR13049362
+# SRR13049363
+# SRR13049364
+# SRR14362275
+# SRR14362276
+# SRR14362281
+# SRR14362282
+# SRR14614715
+# SRR3595211
+# SRR3595212
+# SRR3595213
+# SRR3595214
+
+cd ~/xuruizhi/brain/brain/trim/mouse/
+bsub -q mpi -n 24 -J align -o ~/xuruizhi/brain/brain/alignment/mouse " 
+cat ~/xuruizhi/brain/brain/trim/mouse/pair.list | \
+parallel --no-run-if-empty --linebuffer -k -j 4 ' bowtie2  -p 6  \
+-x  ~/xuruizhi/brain/brain/genome/mouse/mm10 \
+--very-sensitive -X 2000 -1 {}_1_val_1.fq.gz -2 {}_2_val_2.fq.gz \
+2> ~/xuruizhi/brain/brain/alignment/mouse/{}.summary \
+-S ~/xuruizhi/brain/brain/alignment/mouse/{}.sam'"
+# Job <8595215>
+
+# better alignment results are frequently achieved with --very-sensitive
+# use -X 2000 to allow larger fragment size (default is 500)
 
 
 
+# 单端测序
+cd ~/xuruizhi/brain/brain/trim/mouse/
+bowtie2_index=~/xuruizhi/brain/brain/genome/mouse
+align_dir=~/xuruizhi/brain/brain/alignment/mouse
 
+ls *_trimmed.fq.gz > single
+sed 's/_trimmed.fq.gz//g' single >single.list
 
+bsub -q mpi -n 24 -J align_single -o ~/xuruizhi/brain/brain/alignment/mouse " 
+cat ~/xuruizhi/brain/brain/trim/mouse/single.list | \
+parallel --no-run-if-empty --linebuffer -k -j 4 ' bowtie2  -p 1  \
+-x  ~/xuruizhi/brain/brain/genome/mouse/mm10 \
+--very-sensitive -X 2000 -U {}_trimmed.fq.gz \
+2> ~/xuruizhi/brain/brain/alignment/mouse/{}.summary \
+-S ~/xuruizhi/brain/brain/alignment/mouse/{}.sam '"
+# Job <8595222>
+```
 
 
 
