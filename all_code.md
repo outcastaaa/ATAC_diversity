@@ -270,6 +270,7 @@ done
 # 3. 比对前质控
 
 ```bash
+# 由于相邻转座的最小间隔为 38 bp，通常 38 bp 以下的片段直接删除
 rsync -av /mnt/xuruizhi/brain/fastq/ \
 wangq@202.119.37.251:/share/home/wangq/xuruizhi/brain/brain/fastq/
 
@@ -448,24 +449,367 @@ parallel --no-run-if-empty --linebuffer -k -j 4 ' bowtie2  -p 1  \
 -S ~/xuruizhi/brain/brain/alignment/mouse/{}.sam '"
 # Job <8595222>
 ```
-
+* SRR14614715.sam太大了，比对已经完成，但是后续步骤先不进行
 
 ## 4.2 sort_transfertobam_index  
 ```bash
 mkdir -p ~/xuruizhi/brain/brain/sort_bam/mouse
 cd ~/xuruizhi/brain/brain/alignment/mouse/
+
+cat >name.list <<EOF
+SRR11179779
+SRR11179780
+SRR11179781
+SRR13049359
+SRR13049360
+SRR13049361
+SRR13049362
+SRR13049363
+SRR13049364
+SRR14362275
+SRR14362276
+SRR14362281
+SRR14362282
+SRR3595211
+SRR3595212
+SRR3595213
+SRR3595214
+SRR13443549
+SRR13443553
+SRR13443554
+EOF
+
+
 bamdir=~/xuruizhi/brain/brain/sort_bam/mouse
 # sam to bam
 bsub -q mpi -n 24 -J sort_index -o $bamdir " 
-parallel --no-run-if-empty --linebuffer -k -j 4 "
-  samtools sort -@ 6 {1}.sam > $bamdir/{1}.sort.bam
-  samtools index -@ 6 $bamdir/{1}.sort.bam
-  amtools flagstat  -@ 6 $bamdir/{1}.sort.bam > $bamdir/{1}.raw.stat
-" ::: $(ls *.sam)"
+  cat name.list | parallel --no-run-if-empty --linebuffer -k -j 4 '
+  samtools sort -@ 6 {}.sam > $bamdir/{}.sort.bam
+  samtools index -@ 6 $bamdir/{}.sort.bam
+  amtools flagstat  -@ 6 $bamdir/{}.sort.bam > $bamdir/{}.raw.stat'"
 
 # samtools index为已经基于坐标排序后bam或者cram的文件创建索引，默认在当前文件夹产生*.bai的index文件
 # raw.stat记录匹配后原始文件情况
 ```
+
+
+# 5. Post-alignment processing 
+1. 目的：  
+
+去除没有匹配到的、匹配得分较低的、重复的reads(如果两条reads具有相同的长度而且比对到了基因组的同一位置，那么就认为这样的reads是由PCR扩增而来)；去除线粒体中染色质可及区域及ENCODE blacklisted regions。    
+
+## 6.1 remove PCR-duplicate reads
+目的：去除因为PCR偏好性导致的reads重复扩增  
+
+```bash
+mkdir -p ~/xuruizhi/brain/brain/rmdup/mouse
+cd ~/xuruizhi/brain/brain/sort_bam/mouse
+
+bsub -q mpi -n 24 -J rmdup -o ~/xuruizhi/brain/brain/rmdup/mouse " 
+parallel --no-run-if-empty --linebuffer -k -j 8 "
+  picard MarkDuplicates -I {1}.sort.bam \
+	 -O ~/xuruizhi/brain/brain/rmdup/mouse/{1}.rmdup.bam \
+	 -REMOVE_DUPLICATES true \
+   -VALIDATION_STRINGENCY LENIENT \
+	 -M ~/xuruizhi/brain/brain/rmdup/mouse/{1}.log
+
+  samtools index -@ 3 ~/xuruizhi/brain/brain/rmdup/mouse/{1}.rmdup.bam
+  samtools flagstat -@ 3 ~/xuruizhi/brain/brain/rmdup/mouse/{1}.rmdup.bam \
+  > ~/xuruizhi/brain/brain/rmdup/mouse/{1}.rmdup.stat 
+" ::: $(ls *.sort.bam | perl -p -e 's/\.sort\.bam$//')"
+   
+#--VALIDATION_STRINGENCY <验证严格性>此程序读取的所有 SAM 文件的验证严格性。
+#将严格性设置为 SILENT 可以提高处理 BAM 文件时的性能，其中可变长度数据（读取、质量、标签）不需要解码。
+#默认值：严格。 可能的值：{STRICT、LENIENT、SILENT}
+```
+
+## 6.2 remove bad quality reads
+* 目的：保留都比对到同一个染色体的paired reads（proper paired），同时质量较高的reads (mapping quality>=30) 
+
+```bash
+samtools view -f 2 -q 30 -o test.filter.bam test.rmdup.bam
+# -f Retain properly paired reads -f 2
+# -q 取mapping质量大于30的reads
+# Remove reads unmapped, mate unmapped, not primary alignment, reads failing platform, duplicates (-F 1804) 看情况取舍
+```
+
+## 6.3 remove chrM reads
+* 目的：去除比对到线粒体上的reads，这一步一定要做，线粒体上长度小，极大概率覆盖很多reads，造成虚假peak。由于mtDNA读段的百分比是文库质量的指标，我们通常在比对后删除线粒体读段。  
+
+* 统计chrM reads，使用没有去除PCR重复的数据
+```bash
+mkdir -p ~/xuruizhi/brain/brain/stat/mouse
+cd ~/xuruizhi/brain/brain/sort_bam/mouse
+
+bsub -q mpi -n 24 -J stat -o ~/xuruizhi/brain/brain/stat/mouse " 
+parallel --no-run-if-empty --linebuffer -k -j 4 "
+  samtools idxstats {1}.sort.bam | grep 'chrM' | cut -f 3  
+  
+  samtools idxstats {1}.sort.bam | awk '{SUM += $3} END {print SUM}' 
+  # 第一列是染色体名称，第二列是序列长度，第三列是mapped reads数，第四列是unmapped reads数
+" ::: $(ls *.sort.bam | perl -p -e 's/\.sort\.bam$//')"
+```
+* 结果
+```bash
+# 统计chrM reads&每个chr总reads&比例
+8319031 96440057    8.626%
+9067938 105321082   8.617%
+11454225 93733501   12.220%
+18899078 83571727   22.614%
+```
+
+
+* 将上一步和这一步结合起来
+```bash
+mkdir -p ~/xuruizhi/brain/brain/filter/mouse
+cd ~/xuruizhi/brain/brain/rmdup/mouse
+filterdir=~/xuruizhi/brain/brain/filter/mouse
+
+bsub -q mpi -n 24 -J filter -o ~/xuruizhi/brain/brain/filter/mouse " 
+parallel --no-run-if-empty --linebuffer -k -j 4 "
+  samtools view -h -f 2 -q 30 {1}.rmdup.bam | grep -v  chrM | samtools sort -@ 6 \
+  -O bam  -o $filterdir/{1}.filter.bam 
+	samtools index  -@ 6 $filterdir/{1}.filter.bam 
+	samtools flagstat  -@ 6 $filterdir/{1}.filter.bam > ~/xuruizhi/brain/brain/stat/mouse/{1}.filter.stat 
+" ::: $(ls *.rmdup.bam | perl -p -e 's/\.rmdup\.bam$//')"
+```
+* 结果
+```bash
+# 原比对文件数据，以SRR11539111为例
+98013300 + 0 in total (QC-passed reads + QC-failed reads)
+98013300 + 0 primary
+0 + 0 secondary
+0 + 0 supplementary
+0 + 0 duplicates
+0 + 0 primary duplicates
+96440057 + 0 mapped (98.39% : N/A)
+96440057 + 0 primary mapped (98.39% : N/A)
+98013300 + 0 paired in sequencing
+49006650 + 0 read1
+49006650 + 0 read2
+94727152 + 0 properly paired (96.65% : N/A)
+95584080 + 0 with itself and mate mapped
+855977 + 0 singletons (0.87% : N/A)
+160994 + 0 with mate mapped to a different chr
+89323 + 0 with mate mapped to a different chr (mapQ>=5)
+
+# 删除PCR重复+低质量+chrM后数据
+48111744 + 0 in total (QC-passed reads + QC-failed reads)
+48111744 + 0 primary
+0 + 0 secondary
+0 + 0 supplementary
+0 + 0 duplicates
+0 + 0 primary duplicates
+48111744 + 0 mapped (100.00% : N/A)
+48111744 + 0 primary mapped (100.00% : N/A)
+48111744 + 0 paired in sequencing
+24055872 + 0 read1
+24055872 + 0 read2
+48111744 + 0 properly paired (100.00% : N/A)
+48111744 + 0 with itself and mate mapped
+0 + 0 singletons (0.00% : N/A)
+0 + 0 with mate mapped to a different chr
+0 + 0 with mate mapped to a different chr (mapQ>=5)
+```
+
+## 6.4 Blacklist filtering
+
+1. 目的：去除ENCODE blacklisted 区域，通过blacklist的过滤，可以进一步降低peak calling的假阳性。    
+
+本流程采用的方法是：在peak calling之前去除，比对后的reads 去除PCR重复等后单独去除 blacklist region，再 call peak.  
+   
+
+```bash
+# 下载软件
+cd ~/xuruizhi/biosoft/biosoft/bedtools
+tar -zxvf bedtools-2.30.0.tar.gz
+cd bedtools2
+make
+
+
+
+# 下载对应物种的 blacklist.bed文件
+mkdir -p /mnt/d/ATAC/blklist
+cd /mnt/d/ATAC/blklist
+wget https://mitra.stanford.edu/kundaje/akundaje/release/blacklists/mm10-mouse/mm10.blacklist.bed.gz
+gzip -dc mm10.blacklist.bed.gz > mm10.blacklist.bed
+rm *.gz
+wc -l  mm10.blacklist.bed #164
+
+cd /mnt/d/ATAC/filter
+cat config.raw | while read id;
+do 
+  echo $id 
+  arr=($id)
+  sample=${arr[0]}
+
+  echo ${sample}.filter.bam
+
+  # 取交集看bam文件和blacklist有多少重合部分
+  bedtools intersect -wa -a ${sample}.filter.bam  -b ../blklist/mm10.blacklist.bed | wc -l  
+  # 16559
+  # 15119
+  # 15304
+  # 20212
+
+  # 凡是bam中含有blacklist都删除
+  bedtools intersect -v -a ${sample}.filter.bam -b ../blklist/mm10.blacklist.bed > ../blklist/${sample}.final.bam
+  samtools index  -@ 7 ../blklist/${sample}.final.bam
+  samtools flagstat  -@ 7 ../blklist/${sample}.final.bam > ../blklist/${sample}.final.stat
+done
+
+
+cat config.raw | while read id;
+do 
+  echo $id 
+  arr=($id)
+  sample=${arr[0]}
+
+  samtools index  -@ 7 ../blklist/${sample}.final.bam 
+	samtools flagstat  -@ 7 ../blklist/${sample}.final.bam > ../blklist/${sample}.final.stat
+done
+```
+6. 结果解读：  
+```bash
+# 原比对文件数据，以SRR11539111为例
+98013300 + 0 in total (QC-passed reads + QC-failed reads)
+98013300 + 0 primary
+0 + 0 secondary
+0 + 0 supplementary
+0 + 0 duplicates
+0 + 0 primary duplicates
+96440057 + 0 mapped (98.39% : N/A)
+96440057 + 0 primary mapped (98.39% : N/A)
+98013300 + 0 paired in sequencing
+49006650 + 0 read1
+49006650 + 0 read2
+94727152 + 0 properly paired (96.65% : N/A)
+95584080 + 0 with itself and mate mapped
+855977 + 0 singletons (0.87% : N/A)
+160994 + 0 with mate mapped to a different chr
+89323 + 0 with mate mapped to a different chr (mapQ>=5)
+
+# 删除PCR重复+低质量+chrM后数据
+48111744 + 0 in total (QC-passed reads + QC-failed reads)
+48111744 + 0 primary
+0 + 0 secondary
+0 + 0 supplementary
+0 + 0 duplicates
+0 + 0 primary duplicates
+48111744 + 0 mapped (100.00% : N/A)
+48111744 + 0 primary mapped (100.00% : N/A)
+48111744 + 0 paired in sequencing
+24055872 + 0 read1
+24055872 + 0 read2
+48111744 + 0 properly paired (100.00% : N/A)
+48111744 + 0 with itself and mate mapped
+0 + 0 singletons (0.00% : N/A)
+0 + 0 with mate mapped to a different chr
+0 + 0 with mate mapped to a different chr (mapQ>=5)
+
+# 删除blacklist后数据
+47997002 + 0 in total (QC-passed reads + QC-failed reads)
+47997002 + 0 primary
+0 + 0 secondary
+0 + 0 supplementary
+0 + 0 duplicates
+0 + 0 primary duplicates
+47997002 + 0 mapped (100.00% : N/A)
+47997002 + 0 primary mapped (100.00% : N/A)
+47997002 + 0 paired in sequencing
+23998484 + 0 read1
+23998518 + 0 read2
+47997002 + 0 properly paired (100.00% : N/A)
+47997002 + 0 with itself and mate mapped
+0 + 0 singletons (0.00% : N/A)
+0 + 0 with mate mapped to a different chr
+0 + 0 with mate mapped to a different chr (mapQ>=5)
+```
+到这一步，比对文件已经过滤完成。     
+
+
+## 6.5 bamtobed
+1. 目的：后续需要用到 `bed bedpe` 文件，把处理好的bam比对文件转化为bed格式
+2. 使用软件：`bedtools`,[参考文章](https://bedtools.readthedocs.io/en/latest/content/tools/bamtobed.html)  
+3. 代码：
+```bash
+# bam to bed
+mkdir -p /mnt/d/ATAC/bed
+cd /mnt/d/ATAC/blklist
+
+parallel -j 6 "
+   bedtools bamtobed -i ./{1} >../bed/{1}.bed
+" ::: $( ls *.final.bam)
+
+# bam to bedpe 
+mkdir -p /mnt/d/ATAC/bedpe
+cd /mnt/d/ATAC/blklist
+# the BAM file should be sorted by read name beforehand
+parallel -j 6 "
+  samtools sort -n -o ../bedpe/{1}.named {1}
+" ::: $( ls *.final.bam)
+
+cd /mnt/d/ATAC/bedpe
+cat config.raw | while read id;
+do echo $id 
+  arr=($id)
+  sample=${arr[0]}
+  samtools flagstat  -@ 7 ${sample}.final.bam.named > ${sample}.final.bam.named.stat
+done
+  
+
+
+cd /mnt/d/ATAC/bedpe
+# bedtools should extract the paired-end alignments as bedpe format, then awk should shift the fragments as needed
+parallel -j 6 "
+  bedtools bamtobed -i {1} -bedpe > {1}.bedpe
+" ::: $( ls *.final.bam.named)
+```
+注：bedpe转化一定要按照name排序，把双端reads放一起；因为去除blacklist后有些reads被去除无法组成一个pair被skip
+* 结果：
+```bash
+# bed
+$ cat SRR11539111.final.bam.bed | head -n 5
+chr1    3000773 3000873 SRR11539111.41226980/2  32      +
+chr1    3000784 3000884 SRR11539111.41226980/1  32      -
+chr1    3000793 3000893 SRR11539111.46953273/1  34      +
+chr1    3000873 3000969 SRR11539111.16779100/1  36      +
+
+# bedpe
+$ cat SRR11539111.final.bam.named.bedpe | head -n 5
+chr16   79178081        79178149        chr16   79178181        79178281        SRR11539111.1   42      +       -
+chr2    64769626        64769726        chr2    64769944        64770041        SRR11539111.3   40      +       -
+chr13   31981784        31981881        chr13   31981802        31981902        SRR11539111.6   42      +       -
+chr7    45794613        45794710        chr7    45794641        45794740        SRR11539111.12  42      +       -
+chr14   122435898       122435949       chr14   122435898       122435949       SRR11539111.15  42      +       -
+
+```
+* bedpe文件格式  [bed文件格式](https://www.cnblogs.com/djx571/p/9499795.html#:~:text=BED%20%E6%96%87%E4%BB%B6%28Browser%20Extensible%20Data%29%E6%A0%BC%E5%BC%8F%E6%98%AFucsc,%E7%9A%84genome%20browser%E7%9A%84%E4%B8%80%E4%B8%AA%E6%A0%BC%E5%BC%8F%20%2C%E6%8F%90%E4%BE%9B%E4%BA%86%E4%B8%80%E7%A7%8D%E7%81%B5%E6%B4%BB%E7%9A%84%E6%96%B9%E5%BC%8F%E6%9D%A5%E5%AE%9A%E4%B9%89%E7%9A%84%E6%95%B0%E6%8D%AE%E8%A1%8C%EF%BC%8C%E4%BB%A5%E7%94%A8%E6%9D%A5%E6%8F%8F%E8%BF%B0%E6%B3%A8%E9%87%8A%E4%BF%A1%E6%81%AF%E3%80%82%20BED%E8%A1%8C%E6%9C%893%E4%B8%AA%E5%BF%85%E9%A1%BB%E7%9A%84%E5%88%97%E5%92%8C9%E4%B8%AA%E9%A2%9D%E5%A4%96%E5%8F%AF%E9%80%89%E7%9A%84%E5%88%97%E3%80%82)  
+
+```bash
+# 必选的三列：
+chrom - 染色体的名称（例如chr3，chrY，chr2_random）或支架（例如scaffold10671）。
+chromStart- 染色体或scanfold中特征的起始位置。染色体中的第一个碱基编号为0。
+chromEnd- 染色体或scanfold中特征的结束位置。所述 chromEnd碱没有包括在特征的显示。\
+例如，染色体的前100个碱基定义为chromStart = 0，chromEnd = 100，并跨越编号为0-99的碱基。
+
+# 9个可选的BED字段：
+name - 定义BED行的名称。当轨道打开到完全显示模式时，此标签显示在Genome浏览器窗口中BED行的左侧，或者在打包模式下直接显示在项目的左侧。
+score - 得分在0到1000之间。如果此注释数据集的轨迹线useScore属性设置为1，则得分值将确定显示此要素的灰度级别（较高的数字=较深的灰色）。
+strand - 定义strand。要么“。” （=无绞线）或“+”或“ - ”。
+thickStart- 绘制特征的起始位置（例如，基因显示中的起始密码子）。当没有厚部分时，thickStart和thickEnd通常设置为chromStart位置。
+thickEnd - 绘制特征的结束位置（例如基因显示中的终止密码子）。
+itemRgb- R，G，B形式的RGB值（例如255,0,0）。如果轨道行 itemRgb属性设置为“On”，则此RBG值将确定此BED行中包含的数据的显示颜色。\
+注意：建议使用此属性的简单颜色方案（八种颜色或更少颜色），以避免压倒Genome浏览器和Internet浏览器的颜色资源。
+blockCount- BED行中的块（外显子）数。
+blockSizes- 块大小的逗号分隔列表。此列表中的项目数应与blockCount相对应。
+blockStarts - 以逗号分隔的块开始列表。应该相对于chromStart计算所有 blockStart位置。此列表中的项目数应与blockCount相对应。
+
+链接：https://www.jianshu.com/p/9208c3b89e44
+```
+* [bed bedpe格式的区别](https://www.jianshu.com/p/c73c1dc81c61)  
+BEDPE 格式类似于 BED 格式，可用于描述成对的基因组区域。
+由于bed文件原则上不能表示跨染色体的信息，因此，对于结构变异，一般采用的一种基于bed文件的变种文件bedpe格式进行存储。其格式与bed最大的区别在于，对于必须列即chrom、chromStart、chromEnd三列分别记录两次。  
 
 
 
