@@ -372,7 +372,7 @@ rsync -av /mnt/xuruizhi/brain/fastqc_again/ \
 wangq@202.119.37.251:/share/home/wangq/xuruizhi/brain/brain/fastqc_again/
 ```
 # 4. 比对
-
+## 4.1 比对
 1. 参考基因组  
 ```bash
 # 小鼠 mm10 的 bowtie2 的 index 已经建立过，在超算中处理
@@ -447,6 +447,24 @@ parallel --no-run-if-empty --linebuffer -k -j 4 ' bowtie2  -p 1  \
 2> ~/xuruizhi/brain/brain/alignment/mouse/{}.summary \
 -S ~/xuruizhi/brain/brain/alignment/mouse/{}.sam '"
 # Job <8595222>
+```
+
+
+## 4.2 sort_transfertobam_index  
+```bash
+mkdir -p ~/xuruizhi/brain/brain/sort_bam/mouse
+cd ~/xuruizhi/brain/brain/alignment/mouse/
+bamdir=~/xuruizhi/brain/brain/sort_bam/mouse
+# sam to bam
+bsub -q mpi -n 24 -J sort_index -o $bamdir " 
+parallel --no-run-if-empty --linebuffer -k -j 4 "
+  samtools sort -@ 6 {1}.sam > $bamdir/{1}.sort.bam
+  samtools index -@ 6 $bamdir/{1}.sort.bam
+  amtools flagstat  -@ 6 $bamdir/{1}.sort.bam > $bamdir/{1}.raw.stat
+" ::: $(ls *.sam)"
+
+# samtools index为已经基于坐标排序后bam或者cram的文件创建索引，默认在当前文件夹产生*.bai的index文件
+# raw.stat记录匹配后原始文件情况
 ```
 
 
