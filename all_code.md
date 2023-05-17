@@ -264,7 +264,7 @@ do
   do
     echo "fastq-dump --gzip --split-3 -O ${fqdir} ${id}"
   done >sra2fq.sh
-  bsub -q mpi -n 24 -J sra2fq -o ~/xuruizhi/brain/fastq/$line "sh sra2fq.sh > sra2fq.log"
+  bsub -q mpi -n 24 -J sra2fq -o ~/xuruizhi/brain/fastq/$line "bash sra2fq.sh > sra2fq.log"
 done
 ```
 # 3. 比对前质控
@@ -426,11 +426,8 @@ parallel --no-run-if-empty --linebuffer -k -j 4 ' bowtie2  -p 6  \
 2> ~/xuruizhi/brain/brain/alignment/mouse/{}.summary \
 -S ~/xuruizhi/brain/brain/alignment/mouse/{}.sam'"
 # Job <8595215>
-
 # better alignment results are frequently achieved with --very-sensitive
 # use -X 2000 to allow larger fragment size (default is 500)
-
-
 
 # 单端测序
 cd ~/xuruizhi/brain/brain/trim/mouse/
@@ -448,8 +445,62 @@ parallel --no-run-if-empty --linebuffer -k -j 4 ' bowtie2  -p 1  \
 2> ~/xuruizhi/brain/brain/alignment/mouse/{}.summary \
 -S ~/xuruizhi/brain/brain/alignment/mouse/{}.sam '"
 # Job <8595222>
+
+
+
+
+# 超级大批量处理，修雷教的
+cd ~/xuruizhi/brain/brain/trim/mouse/ 
+mkdir -p ~/xuruizhi/brain/brain/alignment_new/mouse
+# 写双端批量
+cat 111.sh
+#!/usr/bin bash
+bowtie2  -p 48 -x  ~/xuruizhi/brain/brain/genome/mouse/mm10 \
+--very-sensitive -X 2000 -1 {}_1_val_1.fq.gz -2 {}_2_val_2.fq.gz \
+2> ~/xuruizhi/brain/brain/alignment_new/mouse/{}.summary \
+-S ~/xuruizhi/brain/brain/alignment_new/mouse/{}.sam
+
+cat pair.list  | while read id; do sed "s/{}/${id}/g" 111.sh > ${id}.sh; done
+# Job <8601500> is submitted to queue <mpi>.
+# Job <8601501> is submitted to queue <mpi>.
+# Job <8601502> is submitted to queue <mpi>.
+# Job <8601503> is submitted to queue <mpi>.
+# Job <8601504> is submitted to queue <mpi>.
+# Job <8601505> is submitted to queue <mpi>.
+# Job <8601506> is submitted to queue <mpi>.
+# Job <8601507> is submitted to queue <mpi>.
+# Job <8601508> is submitted to queue <mpi>.
+# Job <8601509> is submitted to queue <mpi>.
+# Job <8601510> is submitted to queue <mpi>.
+# Job <8601511> is submitted to queue <mpi>.
+# Job <8601512> is submitted to queue <mpi>.
+# Job <8601513> is submitted to queue <mpi>.
+# Job <8601514> is submitted to queue <mpi>.
+# Job <8601515> is submitted to queue <mpi>.
+# Job <8601516> is submitted to queue <mpi>.
+
+
+# 写双端批量
+cat 222.sh
+#!/usr/bin bash
+bowtie2  -p 48 -x  ~/xuruizhi/brain/brain/genome/mouse/mm10 \
+--very-sensitive -X 2000 -1  -U {}_trimmed.fq.gz \
+2> ~/xuruizhi/brain/brain/alignment_new/mouse/{}.summary \
+-S ~/xuruizhi/brain/brain/alignment_new/mouse/{}.sam
+
+cat single.list  | while read id; do sed "s/{}/${id}/g" 222.sh > ${id}.sh; done
+
+cat single.list | while read id
+do
+  bsub -q mpi -n 48 -o ~/xuruizhi/brain/brain/alignment_new/mouse/ "bash ${id}.sh"
+done
+# Job <8601568> is submitted to queue <mpi>.
+# Job <8601569> is submitted to queue <mpi>.
+# Job <8601570> is submitted to queue <mpi>.
 ```
 * SRR14614715.sam太大了，比对已经完成，但是后续步骤先不进行
+
+# 除了SRR14614715.sam重新比对,在~/xuruizhi/brain/brain/alignment_new/mouse/
 
 ## 4.2 sort_transfertobam_index  
 ```bash
@@ -486,44 +537,165 @@ bsub -q mpi -n 24 -J sort_index -o $bamdir "
   cat name.list | parallel --no-run-if-empty --linebuffer -k -j 4 '
   samtools sort -@ 6 {}.sam > $bamdir/{}.sort.bam
   samtools index -@ 6 $bamdir/{}.sort.bam
-  amtools flagstat  -@ 6 $bamdir/{}.sort.bam > $bamdir/{}.raw.stat'"
+  samtools flagstat  -@ 6 $bamdir/{}.sort.bam > $bamdir/{}.raw.stat'"
+# job <8600760>
 
 # samtools index为已经基于坐标排序后bam或者cram的文件创建索引，默认在当前文件夹产生*.bai的index文件
 # raw.stat记录匹配后原始文件情况
 ```
+## 大批量转化
+```bash
+mkdir -p ~/xuruizhi/brain/brain/sort_bam_new/mouse
+cd ~/xuruizhi/brain/brain/alignment_new/mouse/
+cat >name.list <<EOF
+SRR11179779
+SRR11179780
+SRR11179781
+SRR13049359
+SRR13049360
+SRR13049361
+SRR13049362
+SRR13049363
+SRR13049364
+SRR14362275
+SRR14362276
+SRR14362281
+SRR14362282
+SRR3595211
+SRR3595212
+SRR3595213
+SRR3595214
+SRR13443549
+SRR13443553
+SRR13443554
+EOF
 
+
+cat samtobam.sh
+#!/usr/bin bash
+samtools sort -@ 48 {}.sam > ~/xuruizhi/brain/brain/sort_bam_new/mouse/{}.sort.bam
+samtools index -@ 48 ~/xuruizhi/brain/brain/sort_bam/mouse/{}.sort.bam
+samtools flagstat  -@ 48 ~/xuruizhi/brain/brain/sort_bam/mouse/{}.sort.bam > ~/xuruizhi/brain/brain/sort_bam/mouse/{}.raw.stat
+
+cat name.list  | while read id; do sed "s/{}/${id}/g" samtobam.sh > ${id}.sh; done
+
+cat name.list | while read id
+do
+  bsub -q mpi -n 48 -o ~/xuruizhi/brain/brain/sort_bam_new/mouse/ "bash ${id}.sh"
+done
+```
 
 # 5. Post-alignment processing 
 1. 目的：  
 
 去除没有匹配到的、匹配得分较低的、重复的reads(如果两条reads具有相同的长度而且比对到了基因组的同一位置，那么就认为这样的reads是由PCR扩增而来)；去除线粒体中染色质可及区域及ENCODE blacklisted regions。    
 
-## 6.1 remove PCR-duplicate reads
+## 5.1 remove PCR-duplicate reads
 目的：去除因为PCR偏好性导致的reads重复扩增  
 
 ```bash
-mkdir -p ~/xuruizhi/brain/brain/rmdup/mouse
-cd ~/xuruizhi/brain/brain/sort_bam/mouse
+mkdir -p ~/xuruizhi/brain/brain/rmdup_new/mouse
+cd ~/xuruizhi/brain/brain/sort_bam_new/mouse
 
-bsub -q mpi -n 24 -J rmdup -o ~/xuruizhi/brain/brain/rmdup/mouse " 
-parallel --no-run-if-empty --linebuffer -k -j 8 "
-  picard MarkDuplicates -I {1}.sort.bam \
-	 -O ~/xuruizhi/brain/brain/rmdup/mouse/{1}.rmdup.bam \
+cat >name.list <<EOF
+SRR11179779
+SRR11179780
+SRR11179781
+SRR13049359
+SRR13049360
+SRR13049361
+SRR13049362
+SRR13049363
+SRR13049364
+SRR14362275
+SRR14362276
+SRR14362281
+SRR14362282
+SRR3595211
+SRR3595212
+SRR3595213
+SRR3595214
+SRR13443549
+SRR13443553
+SRR13443554
+EOF
+
+
+
+rmdup_dir=~/xuruizhi/brain/brain/rmdup/mouse
+cd ~/xuruizhi/brain/brain/sort_bam/mouse
+bsub -q mpi -n 24 -J rmdup -o $rmdup_dir " 
+cat name.list | parallel -k -j 8 '
+picard MarkDuplicates -I {}.sort.bam \
+	 -O $rmdup_dir/{}.rmdup.bam \
 	 -REMOVE_DUPLICATES true \
    -VALIDATION_STRINGENCY LENIENT \
-	 -M ~/xuruizhi/brain/brain/rmdup/mouse/{1}.log
+   -METRICS_FILE $rmdup_dir/{}.log
+samtools index -@ 3 $rmdup_dir/{}.rmdup.bam
+samtools flagstat -@ 3 $rmdup_dir/{}.rmdup.bam > $rmdup_dir/{}.rmdup.stat'"
+# job <8600145>
 
-  samtools index -@ 3 ~/xuruizhi/brain/brain/rmdup/mouse/{1}.rmdup.bam
-  samtools flagstat -@ 3 ~/xuruizhi/brain/brain/rmdup/mouse/{1}.rmdup.bam \
-  > ~/xuruizhi/brain/brain/rmdup/mouse/{1}.rmdup.stat 
-" ::: $(ls *.sort.bam | perl -p -e 's/\.sort\.bam$//')"
-   
+picard MarkDuplicates -I  SRR13049360.sort.bam \
+	 -O $rmdup_dir/SRR13049360.rmdup.bam \
+	 -REMOVE_DUPLICATES true \
+   -VALIDATION_STRINGENCY LENIENT \
+   -METRICS_FILE $rmdup_dir/SRR13049360.log
+samtools index -@ 3 $rmdup_dir/SRR13049360.rmdup.bam
+samtools flagstat -@ 3 $rmdup_dir/SRR13049360.rmdup.bam > $rmdup_dir/SRR13049360.rmdup.stat
 #--VALIDATION_STRINGENCY <验证严格性>此程序读取的所有 SAM 文件的验证严格性。
 #将严格性设置为 SILENT 可以提高处理 BAM 文件时的性能，其中可变长度数据（读取、质量、标签）不需要解码。
 #默认值：严格。 可能的值：{STRICT、LENIENT、SILENT}
 ```
+## 5.1 大批量去重
+```bash
+mkdir -p ~/xuruizhi/brain/brain/rmdup_new/mouse
+cd ~/xuruizhi/brain/brain/sort_bam_new/mouse
 
-## 6.2 remove bad quality reads
+cat >name.list <<EOF
+SRR11179779
+SRR11179780
+SRR11179781
+SRR13049359
+SRR13049360
+SRR13049361
+SRR13049362
+SRR13049363
+SRR13049364
+SRR14362275
+SRR14362276
+SRR14362281
+SRR14362282
+SRR3595211
+SRR3595212
+SRR3595213
+SRR3595214
+SRR13443549
+SRR13443553
+SRR13443554
+EOF
+
+
+
+cd ~/xuruizhi/brain/brain/sort_bam_new/mouse
+cat rmdup.sh
+#!/usr/bin bash
+parallel -k -j 24 '
+picard MarkDuplicates -I {}.sort.bam -O ~/xuruizhi/brain/brain/rmdup_new/mouse/{}.rmdup.bam \
+-REMOVE_DUPLICATES true -VALIDATION_STRINGENCY LENIENT \
+-METRICS_FILE ~/xuruizhi/brain/brain/rmdup_new/mouse/{}.log'
+samtools index -@ 48 ~/xuruizhi/brain/brain/rmdup_new/mouse/{}.rmdup.bam
+samtools flagstat -@ 48 ~/xuruizhi/brain/brain/rmdup_new/mouse/{}.rmdup.bam > ~/xuruizhi/brain/brain/rmdup_new/mouse/{}.rmdup.stat
+
+cat name.list  | while read id; do sed "s/{}/${id}/g" rmdup.sh > ${id}.sh; done
+
+cat name.list | while read id
+do
+  bsub -q mpi -n 48 -o ~/xuruizhi/brain/brain/rmdup_new/mouse "bash ${id}.sh"
+done
+```
+
+
+## 5.2 remove bad quality reads
 * 目的：保留都比对到同一个染色体的paired reads（proper paired），同时质量较高的reads (mapping quality>=30) 
 
 ```bash
@@ -533,86 +705,50 @@ samtools view -f 2 -q 30 -o test.filter.bam test.rmdup.bam
 # Remove reads unmapped, mate unmapped, not primary alignment, reads failing platform, duplicates (-F 1804) 看情况取舍
 ```
 
-## 6.3 remove chrM reads
+## 5.3 remove chrM reads
 * 目的：去除比对到线粒体上的reads，这一步一定要做，线粒体上长度小，极大概率覆盖很多reads，造成虚假peak。由于mtDNA读段的百分比是文库质量的指标，我们通常在比对后删除线粒体读段。  
 
-* 统计chrM reads，使用没有去除PCR重复的数据
+* 统计chrM reads，使用没有去除PCR重复，先不做了
 ```bash
 mkdir -p ~/xuruizhi/brain/brain/stat/mouse
+cp ~/xuruizhi/brain/brain/sort_bam/mouse/*.raw.stat ~/xuruizhi/brain/brain/stat/mouse/
+cp ~/xuruizhi/brain/brain/sort_bam/mouse/name.list ~/xuruizhi/brain/brain/stat/mouse/
+
 cd ~/xuruizhi/brain/brain/sort_bam/mouse
 
 bsub -q mpi -n 24 -J stat -o ~/xuruizhi/brain/brain/stat/mouse " 
-parallel --no-run-if-empty --linebuffer -k -j 4 "
-  samtools idxstats {1}.sort.bam | grep 'chrM' | cut -f 3  
-  
-  samtools idxstats {1}.sort.bam | awk '{SUM += $3} END {print SUM}' 
-  # 第一列是染色体名称，第二列是序列长度，第三列是mapped reads数，第四列是unmapped reads数
-" ::: $(ls *.sort.bam | perl -p -e 's/\.sort\.bam$//')"
-```
-* 结果
-```bash
-# 统计chrM reads&每个chr总reads&比例
-8319031 96440057    8.626%
-9067938 105321082   8.617%
-11454225 93733501   12.220%
-18899078 83571727   22.614%
+cat name.list | parallel --no-run-if-empty --linebuffer -k -j 12 '
+  samtools idxstats {}.sort.bam | grep 'chrM' | cut -f 3  
+  samtools idxstats {}.sort.bam | awk '{SUM += $3} END {print SUM}''"
+
+# 第一列是染色体名称，第二列是序列长度，第三列是mapped reads数，第四列是unmapped reads数
 ```
 
 
 * 将上一步和这一步结合起来
 ```bash
-mkdir -p ~/xuruizhi/brain/brain/filter/mouse
-cd ~/xuruizhi/brain/brain/rmdup/mouse
-filterdir=~/xuruizhi/brain/brain/filter/mouse
+mkdir -p ~/xuruizhi/brain/brain/filter_new/mouse
+# ~/xuruizhi/brain/brain/filter/mouse
+cp ~/xuruizhi/brain/brain/sort_bam_new/mouse/name.list ~/xuruizhi/brain/brain/filter_new/mouse/
 
-bsub -q mpi -n 24 -J filter -o ~/xuruizhi/brain/brain/filter/mouse " 
-parallel --no-run-if-empty --linebuffer -k -j 4 "
-  samtools view -h -f 2 -q 30 {1}.rmdup.bam | grep -v  chrM | samtools sort -@ 6 \
-  -O bam  -o $filterdir/{1}.filter.bam 
-	samtools index  -@ 6 $filterdir/{1}.filter.bam 
-	samtools flagstat  -@ 6 $filterdir/{1}.filter.bam > ~/xuruizhi/brain/brain/stat/mouse/{1}.filter.stat 
-" ::: $(ls *.rmdup.bam | perl -p -e 's/\.rmdup\.bam$//')"
-```
-* 结果
-```bash
-# 原比对文件数据，以SRR11539111为例
-98013300 + 0 in total (QC-passed reads + QC-failed reads)
-98013300 + 0 primary
-0 + 0 secondary
-0 + 0 supplementary
-0 + 0 duplicates
-0 + 0 primary duplicates
-96440057 + 0 mapped (98.39% : N/A)
-96440057 + 0 primary mapped (98.39% : N/A)
-98013300 + 0 paired in sequencing
-49006650 + 0 read1
-49006650 + 0 read2
-94727152 + 0 properly paired (96.65% : N/A)
-95584080 + 0 with itself and mate mapped
-855977 + 0 singletons (0.87% : N/A)
-160994 + 0 with mate mapped to a different chr
-89323 + 0 with mate mapped to a different chr (mapQ>=5)
 
-# 删除PCR重复+低质量+chrM后数据
-48111744 + 0 in total (QC-passed reads + QC-failed reads)
-48111744 + 0 primary
-0 + 0 secondary
-0 + 0 supplementary
-0 + 0 duplicates
-0 + 0 primary duplicates
-48111744 + 0 mapped (100.00% : N/A)
-48111744 + 0 primary mapped (100.00% : N/A)
-48111744 + 0 paired in sequencing
-24055872 + 0 read1
-24055872 + 0 read2
-48111744 + 0 properly paired (100.00% : N/A)
-48111744 + 0 with itself and mate mapped
-0 + 0 singletons (0.00% : N/A)
-0 + 0 with mate mapped to a different chr
-0 + 0 with mate mapped to a different chr (mapQ>=5)
+
+cd ~/xuruizhi/brain/brain/rmdup_new/mouse
+cat filter.sh
+#!/usr/bin bash
+parallel -k -j 8 ' samtools view -h -f 2 -F 1804 -q 30 {}.rmdup.bam | grep -v  chrM | samtools sort -@ 6 -O bam  -o ~/xuruizhi/brain/brain/filter_new/mouse/{}.filter.bam'
+samtools index -@ 48 ~/xuruizhi/brain/brain/filter_new/mouse/{}.rmdup.bam
+samtools flagstat -@ 48 ~/xuruizhi/brain/brain/filter_new/mouse/{}.rmdup.bam > ~/xuruizhi/brain/brain/filter_new/mouse/{}.rmdup.stat
+
+cat name.list  | while read id; do sed "s/{}/${id}/g" filter.sh > ${id}.sh; done
+
+cat name.list | while read id
+do
+  bsub -q mpi -n 48 -o ~/xuruizhi/brain/brain/filter_new/mouse "bash ${id}.sh"
+done
 ```
 
-## 6.4 Blacklist filtering
+## 5.4 Blacklist filtering
 
 1. 目的：去除ENCODE blacklisted 区域，通过blacklist的过滤，可以进一步降低peak calling的假阳性。    
 
@@ -728,7 +864,7 @@ done
 到这一步，比对文件已经过滤完成。     
 
 
-## 6.5 bamtobed
+## 5.5 bamtobed
 1. 目的：后续需要用到 `bed bedpe` 文件，把处理好的bam比对文件转化为bed格式
 2. 使用软件：`bedtools`,[参考文章](https://bedtools.readthedocs.io/en/latest/content/tools/bamtobed.html)  
 3. 代码：
@@ -811,7 +947,141 @@ blockStarts - 以逗号分隔的块开始列表。应该相对于chromStart计�
 BEDPE 格式类似于 BED 格式，可用于描述成对的基因组区域。
 由于bed文件原则上不能表示跨染色体的信息，因此，对于结构变异，一般采用的一种基于bed文件的变种文件bedpe格式进行存储。其格式与bed最大的区别在于，对于必须列即chrom、chromStart、chromEnd三列分别记录两次。  
 
+# 6. shift reads
+1. 目的：  
 
+由于Tn5酶是以二聚体的形式结合到染色体上的，其跨度大致是9bp，在第一篇ATAC-seq出来的时候，作者就考虑到了这个问题，在分析的时候，需要回补这个9个bp的碱基差。具体做法就是将正链正向移动4bp，将负链负向移动5个bp。一般用alignmentSieve 一步到位。注意，不做reads shift 对单碱基分辨高的分析会有影响，例如TF motif footprinting，但也不是所有TF footprinting分析软件需要shifted reads，很多可以自己转换，e.g. NucleoATAC。   
+
+方法：
+分别对正链和负链的 reads 进行 + 4bp 和 -5bp 的移位（这个长度近似于一个完整的DNA螺旋[why参考文章](https://www.jianshu.com/p/13779b89e76b)），以解释 Tn5 转座酶修复损伤 DNA 所产生的 9bp 的重复，并实现 TF footprint 和 motif 相关分析的碱基对分辨率。  
+
+
+2. 使用软件：该步有很多种[方法](https://yiweiniu.github.io/blog/2019/03/ATAC-seq-data-analysis-from-FASTQ-to-peaks/)，本流程采用 `bedtools` and `awk`.
+
+3. 代码：
+```bash
+mkdir -p /mnt/d/ATAC/Tn5_shift
+cp /mnt/d/ATAC/rmdup/config.raw /mnt/d/ATAC/bedpe/config.raw
+
+# bed转化
+cd /mnt/d/ATAC/bed/
+cat config.raw | while read id;
+do echo $id 
+  arr=($id)
+  sample=${arr[0]}
+
+  cat ${sample}.final.bam.bed | awk -v \
+  OFS="\t" '{if($6=="+"){print $1,$2+4,$3+4} \
+   else if($6=="-"){print $1,$2-5,$3-5}}' \
+    > ../Tn5_shift/${sample}.Tn5.bed
+done
+
+
+# bedpe转化
+cd /mnt/d/ATAC/bedpe
+cat config.raw | while read id;
+do echo $id 
+  arr=($id)
+  sample=${arr[0]}
+
+  cat ${sample}.final.bam.named.bedpe | awk -v \
+  OFS="\t" '{if($9=="+"){print $1,$2+4,$6+4} \
+   else if($9=="-"){print $1,$2-5,$6-5}}' \
+    > ../Tn5_shift/${sample}.Tn5.bedpe
+done
+```
+4. 结果解读：  
+
+
+！注意，后续callpeak不可直接使用bedtools转化的bedpe文件，只能包含三行信息：chr,chrom_start,chrom_end
+```bash
+cd /mnt/d/ATAC/Tn5_shift
+$ cat SRR11539111.Tn5.bed | head -n 5
+chr1    3000777 3000877
+chr1    3000779 3000879
+chr1    3000797 3000897
+chr1    3000877 3000973
+chr1    3000922 3001022
+$ wc -l SRR11539111.Tn5.bed
+# 47997002
+
+$ cat SRR11539111.Tn5.bedpe | head -n 5
+chr16   79178085        79178285
+chr2    64769630        64770045
+chr13   31981788        31981906
+chr7    45794617        45794744
+chr14   122435902       122435953
+$ wc -l SRR11539111.Tn5.bedpe
+# 23998114
+# bedpe文件行数应该是对应bed文件的一半，但是384对被blacklist去除了
+```
+
+
+
+
+# 7. Call peaks 
+1. 目的： 下一步需要在统计学上判断真实的peak，因为Tn5在染色体上结合是个概率事件，如何判断这个位置的reads足够为一个peak，这就需要用到统计检测。ATAC-seq 数据分析的第二个主要步骤是识别开放区域（也称为 Peak），后续高级分析以此为基础。  
+
+2. 使用软件：目前，`MACS2` 是 ENCODE ATAC-seq 流程的默认 Peak caller 程序。  
+
+3. !!!重要：关于是否使用[-f BEDPE的讨论](https://github.com/macs3-project/MACS/issues/331)，可根据需要选择合适的callpeak参数。  
+
+
+4. 其他： 
+
+
+* ATAC-seq关心的是在哪里切断，断点才是peak的中心，所以使用shift模型，--shift -75或-100.   
+
+* 这里选用固定宽度（fixed-width）的peaks,优点有：   
+1）对大量的peaks进行counts和motif分析时可以减小误差；  
+2）对于大量数据集的可以合并峰得到一致性的peaks;   
+
+* 一个样本的overlaps他们是通过迭代移除的方法，首先保留最显著的peak，然后任何与最显著peak有直接overlap的peaks都被移除；接着对另一个最显著性的peak进行相同的操作，最终保留所有更显著的peaks，移除与其有直接overlaps的peaks  
+* 注：后续分析过程需要用到IDR提取consensus peak，建议MACS2 callpeaks的步骤参数设置不要过于严格，以便鉴定出更多的peaks。
+
+4. 代码：
+```bash
+mkdir -p /mnt/d/ATAC/macs2_peaks/
+cd /mnt/d/ATAC/Tn5_shift/
+
+# 注：本流程使用的是经过转化的bedpe
+# 单个样本
+macs2 callpeak  -g mm -f BEDPE --nomodel --keep-dup all \
+  -n SRR11539111 -t ./SRR11539111.Tn5.bedpe \
+  --outdir /mnt/d/ATAC/macs2_peaks/
+
+# 循环
+cp /mnt/d/ATAC/rmdup/config.raw /mnt/d/ATAC/Tn5_shift/config.raw
+cat config.raw | while read id;
+do echo $id 
+  arr=($id)
+  sample=${arr[0]}
+
+  macs2 callpeak  -g mm -f BEDPE --nomodel --keep-dup all \
+   --cutoff-analysis -n ${sample} -t ./${sample}.Tn5.bedpe \
+  --outdir ../macs2_peaks/
+done
+
+# 如果用的不是专门双端测序的bedpe，而是bed文件，采用下面代码
+# 单个样本
+mkdir -p /mnt/d/ATAC/macs2_peaks2/
+cd /mnt/d/ATAC/Tn5_shift/
+macs2 callpeak  -g mm --nomodel \
+  --shift -100 --extsize 200 -n SRR11539111 -t ./SRR11539111.Tn5.bed \
+  --outdir /mnt/d/ATAC/macs2_peaks2/
+
+# 循环
+cp /mnt/d/ATAC/rmdup/config.raw /mnt/d/ATAC/Tn5_shift/config.raw
+cat config.raw | while read id;
+do echo $id 
+  arr=($id)
+  sample=${arr[0]}
+
+  macs2 callpeak  -g mm --nomodel \
+  --shift -100 --extsize 200 -n ${sample} -t ./${sample}.Tn5.bed \
+  --outdir /mnt/d/ATAC/macs2_peaks2/ 
+done
+```
 
 
 
