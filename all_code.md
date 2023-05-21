@@ -484,7 +484,7 @@ cat pair.list  | while read id; do sed "s/{}/${id}/g" 111.sh > ${id}.sh; done
 cat 222.sh
 #!/usr/bin bash
 bowtie2  -p 48 -x  ~/xuruizhi/brain/brain/genome/mouse/mm10 \
---very-sensitive -X 2000 -1  -U {}_trimmed.fq.gz \
+--very-sensitive -X 2000 -U {}_trimmed.fq.gz \
 2> ~/xuruizhi/brain/brain/alignment_new/mouse/{}.summary \
 -S ~/xuruizhi/brain/brain/alignment_new/mouse/{}.sam
 
@@ -494,9 +494,9 @@ cat single.list | while read id
 do
   bsub -q mpi -n 48 -o ~/xuruizhi/brain/brain/alignment_new/mouse/ "bash ${id}.sh"
 done
-# Job <8601568> is submitted to queue <mpi>.
-# Job <8601569> is submitted to queue <mpi>.
-# Job <8601570> is submitted to queue <mpi>.
+# Job <8602391> is submitted to queue <mpi>.
+# Job <8602392> is submitted to queue <mpi>.
+# Job <8602393> is submitted to queue <mpi>.
 ```
 * SRR14614715.sam太大了，比对已经完成，但是后续步骤先不进行
 
@@ -545,7 +545,7 @@ bsub -q mpi -n 24 -J sort_index -o $bamdir "
 ```
 ## 大批量转化
 ```bash
-mkdir -p ~/xuruizhi/brain/brain/sort_bam_new/mouse
+mkdir -p h
 cd ~/xuruizhi/brain/brain/alignment_new/mouse/
 cat >name.list <<EOF
 SRR11179779
@@ -574,8 +574,8 @@ EOF
 cat samtobam.sh
 #!/usr/bin bash
 samtools sort -@ 48 {}.sam > ~/xuruizhi/brain/brain/sort_bam_new/mouse/{}.sort.bam
-samtools index -@ 48 ~/xuruizhi/brain/brain/sort_bam/mouse/{}.sort.bam
-samtools flagstat  -@ 48 ~/xuruizhi/brain/brain/sort_bam/mouse/{}.sort.bam > ~/xuruizhi/brain/brain/sort_bam/mouse/{}.raw.stat
+samtools index -@ 48 ~/xuruizhi/brain/brain/sort_bam_new/mouse/{}.sort.bam
+samtools flagstat  -@ 48 ~/xuruizhi/brain/brain/sort_bam_new/mouse/{}.sort.bam > ~/xuruizhi/brain/brain/sort_bam_new/mouse/{}.raw.stat
 
 cat name.list  | while read id; do sed "s/{}/${id}/g" samtobam.sh > ${id}.sh; done
 
@@ -656,19 +656,19 @@ SRR11179779
 SRR11179780
 SRR11179781
 SRR13049359
-SRR13049360
+SRR13049360.
 SRR13049361
-SRR13049362
-SRR13049363
-SRR13049364
-SRR14362275
+SRR13049362..
+SRR13049363..
+SRR13049364..
+SRR14362275.
 SRR14362276
 SRR14362281
 SRR14362282
-SRR3595211
-SRR3595212
+SRR3595211..
+SRR3595212..
 SRR3595213
-SRR3595214
+SRR3595214..
 SRR13443549
 SRR13443553
 SRR13443554
@@ -679,19 +679,59 @@ EOF
 cd ~/xuruizhi/brain/brain/sort_bam_new/mouse
 cat rmdup.sh
 #!/usr/bin bash
-parallel -k -j 24 '
-picard MarkDuplicates -I {}.sort.bam -O ~/xuruizhi/brain/brain/rmdup_new/mouse/{}.rmdup.bam \
+parallel -k -j 24 'picard MarkDuplicates -I {}.sort.bam -O ~/xuruizhi/brain/brain/rmdup_new/mouse/{}.rmdup.bam \
 -REMOVE_DUPLICATES true -VALIDATION_STRINGENCY LENIENT \
 -METRICS_FILE ~/xuruizhi/brain/brain/rmdup_new/mouse/{}.log'
-samtools index -@ 48 ~/xuruizhi/brain/brain/rmdup_new/mouse/{}.rmdup.bam
-samtools flagstat -@ 48 ~/xuruizhi/brain/brain/rmdup_new/mouse/{}.rmdup.bam > ~/xuruizhi/brain/brain/rmdup_new/mouse/{}.rmdup.stat
-
 cat name.list  | while read id; do sed "s/{}/${id}/g" rmdup.sh > ${id}.sh; done
 
 cat name.list | while read id
 do
+  bsub -q mpi -n 24 -o ~/xuruizhi/brain/brain/rmdup_new/mouse "bash ${id}.sh"
+done
+# 或者
+rmdup_dir=~/xuruizhi/brain/brain/rmdup_new/mouse
+cd ~/xuruizhi/brain/brain/sort_bam_new/mouse
+bsub -q largemem -n 24 -J rmdup -o $rmdup_dir " 
+cat name.list | parallel -k -j 12 '
+picard MarkDuplicates -I {}.sort.bam \
+	 -O $rmdup_dir/{}.rmdup.bam \
+	 -REMOVE_DUPLICATES true \
+   -VALIDATION_STRINGENCY LENIENT \
+   -METRICS_FILE $rmdup_dir/{}.log'"
+
+
+# picard老是出问题，先跑成功的
+
+cd ~/xuruizhi/brain/brain/rmdup_new/mouse
+cat >name_new.list <<EOF
+SRR11179779
+SRR11179780
+SRR11179781
+SRR13049359
+SRR13049361
+SRR14362276
+SRR14362281
+SRR14362282
+SRR3595213
+SRR13443549
+SRR13443553
+SRR13443554
+EOF
+
+cat >index.sh <<EOF
+#!/usr/bin bash
+
+samtools index -@ 48 ~/xuruizhi/brain/brain/rmdup_new/mouse/{}.rmdup.bam
+samtools flagstat -@ 48 ~/xuruizhi/brain/brain/rmdup_new/mouse/{}.rmdup.bam > ~/xuruizhi/brain/brain/rmdup_new/mouse/{}.rmdup.stat
+EOF
+
+cat name_new.list  | while read id; do sed "s/{}/${id}/g" index.sh > ${id}.sh; done
+
+cat name_new.list | while read id
+do
   bsub -q mpi -n 48 -o ~/xuruizhi/brain/brain/rmdup_new/mouse "bash ${id}.sh"
 done
+# Job <8603828-39> is submitted to queue <mpi>.
 ```
 
 
@@ -729,23 +769,24 @@ cat name.list | parallel --no-run-if-empty --linebuffer -k -j 12 '
 ```bash
 mkdir -p ~/xuruizhi/brain/brain/filter_new/mouse
 # ~/xuruizhi/brain/brain/filter/mouse
-cp ~/xuruizhi/brain/brain/sort_bam_new/mouse/name.list ~/xuruizhi/brain/brain/filter_new/mouse/
-
-
+cp ~/xuruizhi/brain/brain/rmdup_new/mouse/name_new.list ~/xuruizhi/brain/brain/filter_new/mouse/
 
 cd ~/xuruizhi/brain/brain/rmdup_new/mouse
-cat filter.sh
+cat >filter.sh <<EOF
 #!/usr/bin bash
-parallel -k -j 8 ' samtools view -h -f 2 -F 1804 -q 30 {}.rmdup.bam | grep -v  chrM | samtools sort -@ 6 -O bam  -o ~/xuruizhi/brain/brain/filter_new/mouse/{}.filter.bam'
-samtools index -@ 48 ~/xuruizhi/brain/brain/filter_new/mouse/{}.rmdup.bam
-samtools flagstat -@ 48 ~/xuruizhi/brain/brain/filter_new/mouse/{}.rmdup.bam > ~/xuruizhi/brain/brain/filter_new/mouse/{}.rmdup.stat
 
-cat name.list  | while read id; do sed "s/{}/${id}/g" filter.sh > ${id}.sh; done
+samtools view -h -f 2 -F 1804 -q 30 {}.rmdup.bam | grep -v  chrM | samtools sort -@ 6 -O bam  -o ~/xuruizhi/brain/brain/filter_new/mouse/{}.filter.bam
+samtools index -@ 48 ~/xuruizhi/brain/brain/filter_new/mouse/{}.filter.bam
+samtools flagstat -@ 48 ~/xuruizhi/brain/brain/filter_new/mouse/{}.filter.bam > ~/xuruizhi/brain/brain/filter_new/mouse/{}.filter.stat
+EOF
+# -F 1804包含read unmapped， mate unmapped，not primary alignment，read fails platform/vendor quality checks，  read is PCR or optical duplicate适合双端测序
+cat name_new.list  | while read id; do sed "s/{}/${id}/g" filter.sh > ${id}_filter.sh; done
 
-cat name.list | while read id
+cat name_new.list | while read id
 do
-  bsub -q mpi -n 48 -o ~/xuruizhi/brain/brain/filter_new/mouse "bash ${id}.sh"
+  bsub -q mpi -n 48 -o ~/xuruizhi/brain/brain/filter_new/mouse "bash ${id}_filter.sh"
 done
+# Job <8604250-263> is submitted to queue <mpi>.
 ```
 
 ## 5.4 Blacklist filtering
@@ -756,107 +797,113 @@ done
    
 
 ```bash
-# 下载软件
-cd ~/xuruizhi/biosoft/biosoft/bedtools
-tar -zxvf bedtools-2.30.0.tar.gz
-cd bedtools2
-make
-
-
-
+# 前面filter删除的太狠了,SRR13443549 SRR13443553 SRR13443554
+# 在本地跑
 # 下载对应物种的 blacklist.bed文件
-mkdir -p /mnt/d/ATAC/blklist
 cd /mnt/d/ATAC/blklist
 wget https://mitra.stanford.edu/kundaje/akundaje/release/blacklists/mm10-mouse/mm10.blacklist.bed.gz
 gzip -dc mm10.blacklist.bed.gz > mm10.blacklist.bed
 rm *.gz
 wc -l  mm10.blacklist.bed #164
 
-cd /mnt/d/ATAC/filter
-cat config.raw | while read id;
+mkdir -p /mnt/xuruizhi/brain/blklist/mouse
+cp /mnt/d/ATAC/blklist/mm10.blacklist.bed /mnt/xuruizhi/brain/blklist/mouse
+
+# 通过beyond compare，将~/xuruizhi/brain/brain/filter_new/mouse传输到/mnt/d/brain/brain/filter_new/mouse
+mkdir -p /mnt/xuruizhi/brain/filter_new/mouse
+cp /mnt/d/brain/brain/filter_new/mouse/* /mnt/xuruizhi/brain/filter_new/mouse
+
+
+cd /mnt/xuruizhi/brain/filter_new/mouse
+cat >name_new.list <<EOF
+SRR11179779
+SRR11179780
+SRR11179781
+SRR13049359
+SRR13049361
+SRR14362276
+SRR14362281
+SRR14362282
+SRR3595213
+SRR13443549
+SRR13443553
+SRR13443554
+EOF
+
+cat name_new.list | while read id;
 do 
   echo $id 
-  arr=($id)
-  sample=${arr[0]}
-
-  echo ${sample}.filter.bam
+  echo "${id}.filter.bam"
 
   # 取交集看bam文件和blacklist有多少重合部分
-  bedtools intersect -wa -a ${sample}.filter.bam  -b ../blklist/mm10.blacklist.bed | wc -l  
-  # 16559
-  # 15119
-  # 15304
-  # 20212
-
-  # 凡是bam中含有blacklist都删除
-  bedtools intersect -v -a ${sample}.filter.bam -b ../blklist/mm10.blacklist.bed > ../blklist/${sample}.final.bam
-  samtools index  -@ 7 ../blklist/${sample}.final.bam
-  samtools flagstat  -@ 7 ../blklist/${sample}.final.bam > ../blklist/${sample}.final.stat
+  bedtools intersect -wa -a ${id}.filter.bam \
+  -b /mnt/xuruizhi/brain/blklist/mouse/mm10.blacklist.bed | \
+  wc -l  > /mnt/xuruizhi/brain/blklist/mouse/${id}.intersect.list
 done
 
-
-cat config.raw | while read id;
+mkdir -p /mnt/xuruizhi/brain/final/mouse
+cd /mnt/xuruizhi/brain/filter_new/mouse
+cat name_new.list | while read id;
 do 
-  echo $id 
-  arr=($id)
-  sample=${arr[0]}
-
-  samtools index  -@ 7 ../blklist/${sample}.final.bam 
-	samtools flagstat  -@ 7 ../blklist/${sample}.final.bam > ../blklist/${sample}.final.stat
+  echo "$id"
+  # 凡是bam中含有blacklist都删除
+  bedtools intersect -v -a ${id}.filter.bam -b ../../blklist/mouse/mm10.blacklist.bed > ../../final/mouse/${id}.final.bam
+  samtools index -@ 7 ../../final/mouse/${id}.final.bam
+  samtools flagstat -@ 7 ../../final/mouse/${id}.final.bam > ../../final/mouse/${id}.final.stat
 done
 ```
 6. 结果解读：  
 ```bash
-# 原比对文件数据，以SRR11539111为例
-98013300 + 0 in total (QC-passed reads + QC-failed reads)
-98013300 + 0 primary
+# 原比对文件数据，以SRR13049361为例
+171031266 + 0 in total (QC-passed reads + QC-failed reads)
+171031266 + 0 primary
 0 + 0 secondary
 0 + 0 supplementary
 0 + 0 duplicates
 0 + 0 primary duplicates
-96440057 + 0 mapped (98.39% : N/A)
-96440057 + 0 primary mapped (98.39% : N/A)
-98013300 + 0 paired in sequencing
-49006650 + 0 read1
-49006650 + 0 read2
-94727152 + 0 properly paired (96.65% : N/A)
-95584080 + 0 with itself and mate mapped
-855977 + 0 singletons (0.87% : N/A)
-160994 + 0 with mate mapped to a different chr
-89323 + 0 with mate mapped to a different chr (mapQ>=5)
+168538658 + 0 mapped (98.54% : N/A)
+168538658 + 0 primary mapped (98.54% : N/A)
+171031266 + 0 paired in sequencing
+85515633 + 0 read1
+85515633 + 0 read2
+166233644 + 0 properly paired (97.19% : N/A)
+167189182 + 0 with itself and mate mapped
+1349476 + 0 singletons (0.79% : N/A)
+101336 + 0 with mate mapped to a different chr
+9484 + 0 with mate mapped to a different chr (mapQ>=5)
 
 # 删除PCR重复+低质量+chrM后数据
-48111744 + 0 in total (QC-passed reads + QC-failed reads)
-48111744 + 0 primary
+63564228 + 0 in total (QC-passed reads + QC-failed reads)
+63564228 + 0 primary
 0 + 0 secondary
 0 + 0 supplementary
 0 + 0 duplicates
 0 + 0 primary duplicates
-48111744 + 0 mapped (100.00% : N/A)
-48111744 + 0 primary mapped (100.00% : N/A)
-48111744 + 0 paired in sequencing
-24055872 + 0 read1
-24055872 + 0 read2
-48111744 + 0 properly paired (100.00% : N/A)
-48111744 + 0 with itself and mate mapped
+63564228 + 0 mapped (100.00% : N/A)
+63564228 + 0 primary mapped (100.00% : N/A)
+63564228 + 0 paired in sequencing
+31782114 + 0 read1
+31782114 + 0 read2
+63564228 + 0 properly paired (100.00% : N/A)
+63564228 + 0 with itself and mate mapped
 0 + 0 singletons (0.00% : N/A)
 0 + 0 with mate mapped to a different chr
 0 + 0 with mate mapped to a different chr (mapQ>=5)
 
 # 删除blacklist后数据
-47997002 + 0 in total (QC-passed reads + QC-failed reads)
-47997002 + 0 primary
+63547428 + 0 in total (QC-passed reads + QC-failed reads)
+63547428 + 0 primary
 0 + 0 secondary
 0 + 0 supplementary
 0 + 0 duplicates
 0 + 0 primary duplicates
-47997002 + 0 mapped (100.00% : N/A)
-47997002 + 0 primary mapped (100.00% : N/A)
-47997002 + 0 paired in sequencing
-23998484 + 0 read1
-23998518 + 0 read2
-47997002 + 0 properly paired (100.00% : N/A)
-47997002 + 0 with itself and mate mapped
+63547428 + 0 mapped (100.00% : N/A)
+63547428 + 0 primary mapped (100.00% : N/A)
+63547428 + 0 paired in sequencing
+31773708 + 0 read1
+31773720 + 0 read2
+63547428 + 0 properly paired (100.00% : N/A)
+63547428 + 0 with itself and mate mapped
 0 + 0 singletons (0.00% : N/A)
 0 + 0 with mate mapped to a different chr
 0 + 0 with mate mapped to a different chr (mapQ>=5)
@@ -865,21 +912,23 @@ done
 
 
 ## 5.5 bamtobed
-1. 目的：后续需要用到 `bed bedpe` 文件，把处理好的bam比对文件转化为bed格式
-2. 使用软件：`bedtools`,[参考文章](https://bedtools.readthedocs.io/en/latest/content/tools/bamtobed.html)  
-3. 代码：
+把处理好的bam比对文件转化为bed格式
+
 ```bash
 # bam to bed
-mkdir -p /mnt/d/ATAC/bed
-cd /mnt/d/ATAC/blklist
+mkdir -p /mnt/xuruizhi/brain/bed/mouse
+cd /mnt/xuruizhi/brain/final/mouse
 
 parallel -j 6 "
-   bedtools bamtobed -i ./{1} >../bed/{1}.bed
+   bedtools bamtobed -i ./{1} >../../bed/mouse/{1}.bed
 " ::: $( ls *.final.bam)
 
+
+
+# 含有单端测序，此处只进行单端bed 
 # bam to bedpe 
-mkdir -p /mnt/d/ATAC/bedpe
-cd /mnt/d/ATAC/blklist
+mkdir -p /mnt/xuruizhi/brain/bedpe/mouse
+cd /mnt/xuruizhi/brain/final/mouse
 # the BAM file should be sorted by read name beforehand
 parallel -j 6 "
   samtools sort -n -o ../bedpe/{1}.named {1}
@@ -892,8 +941,6 @@ do echo $id
   sample=${arr[0]}
   samtools flagstat  -@ 7 ${sample}.final.bam.named > ${sample}.final.bam.named.stat
 done
-  
-
 
 cd /mnt/d/ATAC/bedpe
 # bedtools should extract the paired-end alignments as bedpe format, then awk should shift the fragments as needed
@@ -905,22 +952,18 @@ parallel -j 6 "
 * 结果：
 ```bash
 # bed
-$ cat SRR11539111.final.bam.bed | head -n 5
-chr1    3000773 3000873 SRR11539111.41226980/2  32      +
-chr1    3000784 3000884 SRR11539111.41226980/1  32      -
-chr1    3000793 3000893 SRR11539111.46953273/1  34      +
-chr1    3000873 3000969 SRR11539111.16779100/1  36      +
-
-# bedpe
-$ cat SRR11539111.final.bam.named.bedpe | head -n 5
-chr16   79178081        79178149        chr16   79178181        79178281        SRR11539111.1   42      +       -
-chr2    64769626        64769726        chr2    64769944        64770041        SRR11539111.3   40      +       -
-chr13   31981784        31981881        chr13   31981802        31981902        SRR11539111.6   42      +       -
-chr7    45794613        45794710        chr7    45794641        45794740        SRR11539111.12  42      +       -
-chr14   122435898       122435949       chr14   122435898       122435949       SRR11539111.15  42      +       -
-
+$ cat SRR11179779.final.bam.bed | head -n 10
+chr1    3000665 3000748 SRR11179779.29048935/2  42      +
+chr1    3001025 3001175 SRR11179779.29048935/1  42      -
+chr1    3001182 3001332 SRR11179779.13631674/2  42      +
+chr1    3001547 3001697 SRR11179779.13631674/1  42      -
+chr1    3001663 3001813 SRR11179779.34885572/1  37      +
+chr1    3001709 3001859 SRR11179779.34885572/2  37      -
+chr1    3003183 3003326 SRR11179779.15040555/1  42      +
+chr1    3003208 3003326 SRR11179779.15040555/2  42      -
+chr1    3003705 3003785 SRR11179779.1674968/1   42      +
+chr1    3003716 3003785 SRR11179779.1674968/2   42      -
 ```
-* bedpe文件格式  [bed文件格式](https://www.cnblogs.com/djx571/p/9499795.html#:~:text=BED%20%E6%96%87%E4%BB%B6%28Browser%20Extensible%20Data%29%E6%A0%BC%E5%BC%8F%E6%98%AFucsc,%E7%9A%84genome%20browser%E7%9A%84%E4%B8%80%E4%B8%AA%E6%A0%BC%E5%BC%8F%20%2C%E6%8F%90%E4%BE%9B%E4%BA%86%E4%B8%80%E7%A7%8D%E7%81%B5%E6%B4%BB%E7%9A%84%E6%96%B9%E5%BC%8F%E6%9D%A5%E5%AE%9A%E4%B9%89%E7%9A%84%E6%95%B0%E6%8D%AE%E8%A1%8C%EF%BC%8C%E4%BB%A5%E7%94%A8%E6%9D%A5%E6%8F%8F%E8%BF%B0%E6%B3%A8%E9%87%8A%E4%BF%A1%E6%81%AF%E3%80%82%20BED%E8%A1%8C%E6%9C%893%E4%B8%AA%E5%BF%85%E9%A1%BB%E7%9A%84%E5%88%97%E5%92%8C9%E4%B8%AA%E9%A2%9D%E5%A4%96%E5%8F%AF%E9%80%89%E7%9A%84%E5%88%97%E3%80%82)  
 
 ```bash
 # 必选的三列：
@@ -933,39 +976,35 @@ chromEnd- 染色体或scanfold中特征的结束位置。所述 chromEnd碱没�
 name - 定义BED行的名称。当轨道打开到完全显示模式时，此标签显示在Genome浏览器窗口中BED行的左侧，或者在打包模式下直接显示在项目的左侧。
 score - 得分在0到1000之间。如果此注释数据集的轨迹线useScore属性设置为1，则得分值将确定显示此要素的灰度级别（较高的数字=较深的灰色）。
 strand - 定义strand。要么“。” （=无绞线）或“+”或“ - ”。
-thickStart- 绘制特征的起始位置（例如，基因显示中的起始密码子）。当没有厚部分时，thickStart和thickEnd通常设置为chromStart位置。
-thickEnd - 绘制特征的结束位置（例如基因显示中的终止密码子）。
-itemRgb- R，G，B形式的RGB值（例如255,0,0）。如果轨道行 itemRgb属性设置为“On”，则此RBG值将确定此BED行中包含的数据的显示颜色。\
-注意：建议使用此属性的简单颜色方案（八种颜色或更少颜色），以避免压倒Genome浏览器和Internet浏览器的颜色资源。
-blockCount- BED行中的块（外显子）数。
-blockSizes- 块大小的逗号分隔列表。此列表中的项目数应与blockCount相对应。
-blockStarts - 以逗号分隔的块开始列表。应该相对于chromStart计算所有 blockStart位置。此列表中的项目数应与blockCount相对应。
-
-链接：https://www.jianshu.com/p/9208c3b89e44
 ```
-* [bed bedpe格式的区别](https://www.jianshu.com/p/c73c1dc81c61)  
-BEDPE 格式类似于 BED 格式，可用于描述成对的基因组区域。
-由于bed文件原则上不能表示跨染色体的信息，因此，对于结构变异，一般采用的一种基于bed文件的变种文件bedpe格式进行存储。其格式与bed最大的区别在于，对于必须列即chrom、chromStart、chromEnd三列分别记录两次。  
 
 # 6. shift reads
-1. 目的：  
 
 由于Tn5酶是以二聚体的形式结合到染色体上的，其跨度大致是9bp，在第一篇ATAC-seq出来的时候，作者就考虑到了这个问题，在分析的时候，需要回补这个9个bp的碱基差。具体做法就是将正链正向移动4bp，将负链负向移动5个bp。一般用alignmentSieve 一步到位。注意，不做reads shift 对单碱基分辨高的分析会有影响，例如TF motif footprinting，但也不是所有TF footprinting分析软件需要shifted reads，很多可以自己转换，e.g. NucleoATAC。   
 
-方法：
-分别对正链和负链的 reads 进行 + 4bp 和 -5bp 的移位（这个长度近似于一个完整的DNA螺旋[why参考文章](https://www.jianshu.com/p/13779b89e76b)），以解释 Tn5 转座酶修复损伤 DNA 所产生的 9bp 的重复，并实现 TF footprint 和 motif 相关分析的碱基对分辨率。  
-
-
-2. 使用软件：该步有很多种[方法](https://yiweiniu.github.io/blog/2019/03/ATAC-seq-data-analysis-from-FASTQ-to-peaks/)，本流程采用 `bedtools` and `awk`.
-
-3. 代码：
 ```bash
-mkdir -p /mnt/d/ATAC/Tn5_shift
+mkdir -p /mnt/xuruizhi/brain/Tn5_shift/mouse
 cp /mnt/d/ATAC/rmdup/config.raw /mnt/d/ATAC/bedpe/config.raw
 
+
 # bed转化
-cd /mnt/d/ATAC/bed/
-cat config.raw | while read id;
+cd /mnt/xuruizhi/brain/bed/mouse
+cat >name_new.list <<EOF
+SRR11179779
+SRR11179780
+SRR11179781
+SRR13049359
+SRR13049361
+SRR14362276
+SRR14362281
+SRR14362282
+SRR3595213
+SRR13443549
+SRR13443553
+SRR13443554
+EOF
+
+cat name_new.list | while read id;
 do echo $id 
   arr=($id)
   sample=${arr[0]}
@@ -973,21 +1012,7 @@ do echo $id
   cat ${sample}.final.bam.bed | awk -v \
   OFS="\t" '{if($6=="+"){print $1,$2+4,$3+4} \
    else if($6=="-"){print $1,$2-5,$3-5}}' \
-    > ../Tn5_shift/${sample}.Tn5.bed
-done
-
-
-# bedpe转化
-cd /mnt/d/ATAC/bedpe
-cat config.raw | while read id;
-do echo $id 
-  arr=($id)
-  sample=${arr[0]}
-
-  cat ${sample}.final.bam.named.bedpe | awk -v \
-  OFS="\t" '{if($9=="+"){print $1,$2+4,$6+4} \
-   else if($9=="-"){print $1,$2-5,$6-5}}' \
-    > ../Tn5_shift/${sample}.Tn5.bedpe
+    > /mnt/xuruizhi/brain/Tn5_shift/mouse/${sample}.Tn5.bed
 done
 ```
 4. 结果解读：  
@@ -995,25 +1020,15 @@ done
 
 ！注意，后续callpeak不可直接使用bedtools转化的bedpe文件，只能包含三行信息：chr,chrom_start,chrom_end
 ```bash
-cd /mnt/d/ATAC/Tn5_shift
-$ cat SRR11539111.Tn5.bed | head -n 5
+cd /mnt/xuruizhi/brain/Tn5_shift/mouse/
+$ cat SRR13049361.Tn5.bed | head -n 5
 chr1    3000777 3000877
 chr1    3000779 3000879
 chr1    3000797 3000897
 chr1    3000877 3000973
 chr1    3000922 3001022
-$ wc -l SRR11539111.Tn5.bed
+$ wc -l SRR13049361.Tn5.bed
 # 47997002
-
-$ cat SRR11539111.Tn5.bedpe | head -n 5
-chr16   79178085        79178285
-chr2    64769630        64770045
-chr13   31981788        31981906
-chr7    45794617        45794744
-chr14   122435902       122435953
-$ wc -l SRR11539111.Tn5.bedpe
-# 23998114
-# bedpe文件行数应该是对应bed文件的一半，但是384对被blacklist去除了
 ```
 
 
@@ -1022,67 +1037,359 @@ $ wc -l SRR11539111.Tn5.bedpe
 # 7. Call peaks 
 1. 目的： 下一步需要在统计学上判断真实的peak，因为Tn5在染色体上结合是个概率事件，如何判断这个位置的reads足够为一个peak，这就需要用到统计检测。ATAC-seq 数据分析的第二个主要步骤是识别开放区域（也称为 Peak），后续高级分析以此为基础。  
 
-2. 使用软件：目前，`MACS2` 是 ENCODE ATAC-seq 流程的默认 Peak caller 程序。  
-
-3. !!!重要：关于是否使用[-f BEDPE的讨论](https://github.com/macs3-project/MACS/issues/331)，可根据需要选择合适的callpeak参数。  
-
-
-4. 其他： 
-
-
-* ATAC-seq关心的是在哪里切断，断点才是peak的中心，所以使用shift模型，--shift -75或-100.   
-
-* 这里选用固定宽度（fixed-width）的peaks,优点有：   
-1）对大量的peaks进行counts和motif分析时可以减小误差；  
-2）对于大量数据集的可以合并峰得到一致性的peaks;   
-
-* 一个样本的overlaps他们是通过迭代移除的方法，首先保留最显著的peak，然后任何与最显著peak有直接overlap的peaks都被移除；接着对另一个最显著性的peak进行相同的操作，最终保留所有更显著的peaks，移除与其有直接overlaps的peaks  
-* 注：后续分析过程需要用到IDR提取consensus peak，建议MACS2 callpeaks的步骤参数设置不要过于严格，以便鉴定出更多的peaks。
-
-4. 代码：
 ```bash
 mkdir -p /mnt/d/ATAC/macs2_peaks/
 cd /mnt/d/ATAC/Tn5_shift/
 
-# 注：本流程使用的是经过转化的bedpe
-# 单个样本
-macs2 callpeak  -g mm -f BEDPE --nomodel --keep-dup all \
-  -n SRR11539111 -t ./SRR11539111.Tn5.bedpe \
-  --outdir /mnt/d/ATAC/macs2_peaks/
-
-# 循环
-cp /mnt/d/ATAC/rmdup/config.raw /mnt/d/ATAC/Tn5_shift/config.raw
-cat config.raw | while read id;
-do echo $id 
-  arr=($id)
-  sample=${arr[0]}
-
-  macs2 callpeak  -g mm -f BEDPE --nomodel --keep-dup all \
-   --cutoff-analysis -n ${sample} -t ./${sample}.Tn5.bedpe \
-  --outdir ../macs2_peaks/
-done
-
 # 如果用的不是专门双端测序的bedpe，而是bed文件，采用下面代码
 # 单个样本
-mkdir -p /mnt/d/ATAC/macs2_peaks2/
-cd /mnt/d/ATAC/Tn5_shift/
-macs2 callpeak  -g mm --nomodel \
-  --shift -100 --extsize 200 -n SRR11539111 -t ./SRR11539111.Tn5.bed \
-  --outdir /mnt/d/ATAC/macs2_peaks2/
+mkdir -p /mnt/xuruizhi/brain/macs2_peaks/mouse
+cd /mnt/xuruizhi/brain/Tn5_shift/mouse
+cat >name_new.list <<EOF
+SRR11179779
+SRR11179780
+SRR11179781
+SRR13049359
+SRR13049361
+SRR14362276
+SRR14362281
+SRR14362282
+SRR3595213
+SRR13443549
+SRR13443553
+SRR13443554
+EOF
 
 # 循环
-cp /mnt/d/ATAC/rmdup/config.raw /mnt/d/ATAC/Tn5_shift/config.raw
-cat config.raw | while read id;
+cat name_new.list | while read id;
 do echo $id 
   arr=($id)
   sample=${arr[0]}
 
   macs2 callpeak  -g mm --nomodel \
   --shift -100 --extsize 200 -n ${sample} -t ./${sample}.Tn5.bed \
-  --outdir /mnt/d/ATAC/macs2_peaks2/ 
+  --outdir /mnt/xuruizhi/brain/macs2_peaks/mouse 
+done
+mkdir -p /mnt/d/brain/brain/macs2_peaks/mouse
+cp /mnt/xuruizhi/brain/macs2_peaks/mouse/* /mnt/d/brain/brain/macs2_peaks/mouse/
+```
+
+# 8. Visualization    
+1. 目的： 将上文产生的文件放在`IGV`中可视化  
+
+
+## 8.1 filterbam2Bw    
+
+1. 目的： bw文件是用于方便可视化peak的文件，因为上游处理完的bam文件通常都较大，不方便于快速展示，而将其转变成bw(bigwig)或者wig就会方便的多，而bigWig文件的显示性能又相较wig文件快得多，故bw是更常用的。而相较于bed文件相说，它不只提供了peak的位置，还有peak的高低。 
+
+* bam转bw: 因为此处不看细节位置，不看共同peak，所以使用final.bam文件  
+
+```bash 
+mkdir -p  /mnt/xuruizhi/brain/bw/mouse/
+cd /mnt/xuruizhi/brain/final/mouse #该目录下需要包含最终过滤后的bam文件和其bai索引
+ls *.bam | while read id; 
+do 
+  bamCoverage -p 6  -b $id \
+  -o ../../bw/mouse/${id%%.*}.bw \
+  --binSize 20 \
+  --smoothLength 60 \
+  --normalizeUsing RPKM \
+  --centerReads 
+  # 1 > ../../bw/mouse/${id%%.*}_bamCoverage.log
+done
+
+# bamCoverage注意大小写
+# --binSize Size of the bins, in bases, for the output of the bigwig/bedgraph file. (Default: 50)
+# --smoothLength The smooth length defines a window, larger than the binSize, to average the number of reads.
+# 可选--blackListFileName BED file  A BED or GTF file containing regions that should be excluded from all analyses.  
+# --normalizeUsing {RPKM,CPM,BPM,RPGC,None} Use one of the entered methods to normalize the number of reads per bin. 
+# （bw文件夹中last.bam文件使用CPM标准化）--normalizeTo1x: 按照1x测序深度(reads per genome coverage, RPGC)进行标准化
+# --centerReads         By adding this option, reads are centered with respect to the fragment length. For paired-end
+#                         data, the read is centered at the fragment length defined by the two ends of the fragment. For
+#                         single-end data, the given fragment length is used. This option is useful to get a sharper
+#                         signal around enriched regions. (default: False)
+```
+
+## 8.2 TSS enrichment  执行报错，还未完成
+
+目的：通过观察 peaks 围绕 TSS 的分布情况，判断数据与理论推理是否一致；若一致则证明测序正常。  
+
+
+来自 NFR（没有核小体的区域） 的片段预计会在基因的转录起始位点 (transcription start site, TSS) 附近富集，而来自核小体结合区域的片段预计会在 TSS 附近被耗尽，在 TSS 附近的侧翼区域会有少量富集 。  [(Fig. 1c)](https://github.com/outcastaaa/ATAC/blob/main/pictures/1c.png)  
+
+① make dir
+```bash
+mkdir -p /mnt/xuruizhi/brain/TSS/mouse/
+```
+② 下载TSS注释文件：the BED file which contains the coordinates for all genes [下载地址](http://rohsdb.cmb.usc.edu/GBshape/cgi-bin/hgTables?hgsid=6884883_WoMR8YyIAAVII92Rr1Am3Kd0jr5H&clade=mammal&org=Mouse&db=mm10&hgta_group=genes&hgta_track=knownGene&hgta_table=0&hgta_regionType=genome&position=chr12%3A56703576-56703740&hgta_outputType=primaryTable&hgta_outFileName=)   
+[参数选择](https://www.jianshu.com/p/d6cb795af22a)   
+
+genome:mouse --> assemble:mm10 --> gruop:genes and gene predictions --> track:UCSC genes or NCBI RefSeq --> table:如果track选择NCBI RefSeq，这里就选择RefSeq；如果track选择UCSC gene，这里就选knownGene --> output format根据自己的需求选择 --> file type returned这里选gzip compressed，这样就可以下载到压缩包格式的输出文件，选text则下载文本格式 --> output file一定要写上一个文件名字，如果为空则后面无法下载，而只能在浏览器上查看 --> 最后点击get output即可  
+
+将`mm10.reseq.bed`保存在 /mnt/d/ATAC/TSS 文件夹内。 
+```bash
+cp /mnt/d/ATAC/TSS/mm10.refseq.bed /mnt/xuruizhi/brain/TSS/mouse/
+``` 
+
+③ 对比对后的bam文件转化为`bw文件`，保存在  /mnt/xuruizhi/brain/bw/mouse/ 文件夹内  
+
+④ 绘图  
+`computeMatrix`根据所提供的refseq.bed文件计算bw文件中在TSS附近左右信号强度，选取的左右可以直接调；若某些转录本附近没有reads，不会计算该位点的信号强度，也可以做自己得到的peaks附近的信号强度。    
+
+用`plotHeatmap`以热图的方式对覆盖进行可视化，用`plotProfile`以折线图的方式展示覆盖情况，该图本质上是一个密度图，用于评估所有转录起始位点的reads密度。  
+
+computeMatrix具有两个模式: `scale-region` 和 `reference-point`。前者用来信号在一个区域内分布，后者查看信号相对于某一个点的分布情况。无论是那个模式，都有两个参数是必须的，-S是提供bigwig文件，-R是提供基因的注释信息。还有更多个性化的可视化选项。  
+
+* 每个样本单独画图  
+```bash
+pip install "numpy<1.24"
+
+cd /mnt/xuruizhi/brain/bw/mouse/
+mkdir -p /mnt/xuruizhi/brain/TSS/mouse
+# 循环
+ls *.bw | while read id; 
+do 
+  computeMatrix reference-point --referencePoint TSS -p 6 \
+    -b 1000  -a 1000 \
+    -R /mnt/xuruizhi/brain/TSS/mouse/mm10.refseq.bed \
+    -S $id \
+    --skipZeros \
+    -o /mnt/xuruizhi/brain/TSS/mouse/$id_matrix.gz \
+    --outFileSortedRegions /mnt/xuruizhi/brain/TSS/mouse/${id%%.*}_regions.bed
+    1 > /mnt/xuruizhi/brain/TSS/mouse/${id%%.*}.log
+done
+# --referencePoint Possible choices: TSS, TES, center
+# -b, --upstream Distance upstream of the reference-point selected. (Default: 500)
+# -a, --downstream Distance downstream of the reference-point selected. (Default: 1500)
+# --missingDataAsZero  If set, missing data (NAs) will be treated as zeros. The default is to ignore such cases, which will be depicted as black areas in a heatmap.
+# --skipZeros Whether regions with only scores of zero should be included or not. Default is to include them.  
+# --binSize Length, in bases, of the non-overlapping bins for averaging the score over the regions length. (Default: 10)  
+# --blackListFileName, -bl A BED file containing regions that should be excluded from all analyses. Currently this works by rejecting genomic chunks that happen to overlap an entry.
+# Consequently, for BAM files, if a read partially overlaps a blacklisted region or a fragment spans over it, then the read/fragment might still be considered.
+# --binSize BINSIZE 几个bp分数取平均，默认:10bp  
+
+# profile plot
+ls *.log | while read id; 
+do 
+  plotProfile -m /mnt/xuruizhi/brain/TSS/mouse/${id%%.*}_matrix.gz \
+    -out /mnt/xuruizhi/brain/TSS/mouse/${id%%.*}_profile.png \
+    --perGroup \
+    --colors green \
+    --plotTitle "" \
+    --refPointLabel "TSS" \
+    -T "${id%%.*} read density" \
+    -z ""
+done
+#--perGroup            The default is to plot all groups of regions by sample. Using this option instead plots all
+                        # samples by group of regions. Note that this is only useful if you have multiple groups of
+                        # regions. by sample rather than group. (default: False)
+
+
+# heatmap and profile plot
+ls *.log | while read id; 
+do 
+  plotHeatmap -m /mnt/xuruizhi/brain/TSS/mouse/${id%%.*}_matrix.gz \
+    -out /mnt/xuruizhi/brain/TSS/mouse/${id%%.*}_heatmap.png \
+    --colorMap RdBu \
+    --zMin -12 --zMax 12
+done
+
+
+#单独heatmap
+ls *.log | while read id; 
+do
+plotHeatmap -m /mnt/xuruizhi/brain/TSS/mouse/${id%%.*}_matrix.gz \
+-out /mnt/xuruizhi/brain/TSS/mouse/${id%%.*}_heatmap2.png \
+--colorMap RdBu \
+--whatToShow 'heatmap and colorbar' \
+--zMin -8 --zMax 8  
 done
 ```
 
+
+
+* 画 `gene body` 区，使用 `scale-regions`  
+```bash
+cd /mnt/xuruizhi/brain/bw/mouse
+mkdir -p /mnt/xuruizhi/brain/genebody/mouse/
+# create a matrix 
+computeMatrix scale-regions -p 6 \
+    -b 10000  -a 10000 \
+    -R /mnt/xuruizhi/brain/TSS/mouse/mm10.refseq.bed \
+    -S SRR11539111.bw \
+    --skipZeros \
+    -o /mnt/d/ATAC/genebody/SRR11539111_matrix.gz 
+  
+cd /mnt/d/ATAC/genebody
+plotHeatmap -m /mnt/d/ATAC/genebody/SRR11539111_matrix.gz \
+    -out /mnt/d/ATAC/genebody/SRR11539111_heatmap.png 
+
+plotProfile -m /mnt/d/ATAC/genebody/SRR11539111_matrix.gz \
+    -out /mnt/d/ATAC/genebody/SRR11539111_profile.png 
+    #不太好看，还需要调整参数
+```
+
+
+# 9. 使用diffbind做主成分分析
+
+
+① read in a set of peaksets and associated metadata  
+
+
+* 原理：DiffBind 所需的输入是数据集中的所有样本以及每个样本的所有峰（不仅仅是高置信度峰），合并函数会查找 `overlap peak` 的基因组区间，如果某区间出现在两个及以上的样本中，定义为`consensus peakset`；具有rep需要单独使用，不可合并（因此在寻找差异peak时，不可使用IDR找到的consensus peak）。  
+
+* [具体参数](https://rdrr.io/bioc/DiffBind/man/dba.html)  
+
+* 输入文件：[参考官网man](https://rdrr.io/bioc/DiffBind/man/dba.html)    
+文件格式：CSV表（，分隔）；表格.xls/xlsx  
+sample sheet是一个列表，需要包括以下几列:"SamplelD"，"Tissue"，"Factor"，"Condition"， "Treatment"，"Replicate"， "bamReads"，"ControllD"，"bamControl"，"Peaks"和"PeakCaller"   
+
+* 内容格式：  
+
+| header  | detial  |
+|:---:|:---:|
+|  SampleID |  样本ID，给你输入的数据起个名  |
+| Tissue，Factor，Condition，Treatment  |  都为数据的备注，包括组织来源/细胞系，状态，处理等，可不填，但是会影响后面分析的聚类。factor不是很重要；Treatment就是分组，对照或者不同处理，也可以是对照和过表达/KO等 |
+| Replicate  |  第几次重复 |
+| bamReads  |  ChIP-seq得到的bam文件，bam文件的绝对路径|
+| ControlID  | Call peak时使用的input数据的ID，ATAC不需要  |
+|  bamControl |  input对应的bam文件，ATAC不需要 |
+|  Peaks | 峰文件，这里有多种数据格式可作为输入：1. macs2 输出的.narrowPeak等峰文件 2. 包括所有call peak 得到的peak位置信息的.bed 文件，不是Macs2直接得到的bed文件 3. 以上两种格式得到的.gz文件 |
+| PeakCaller  |  用何种方式做的peak calling，默认峰值格式：narrowPeaks 文件 |   
+
+
+
+* 输入：注意！！！一定把对照组放前面，把实验组放在后面  
+```bash
+mkdir -p /mnt/d/brain/brain/final/mouse/
+cp /mnt/xuruizhi/brain/final/mouse/* /mnt/d/brain/brain/final/mouse/
+mkdir -p /mnt/d/brain/brain/macs2_peaks/mouse/
+cp /mnt/xuruizhi/brain/macs2_peaks/mouse/* /mnt/d/brain/brain/macs2_peaks/mouse/
+
+```
+
+| SampleID | Tissue         | Factor              | Condition | Treatment | Replicate | bamReads                                | ControlID | bamControl | Peaks                                               | PeakCaller |
+|:--------:|:--------------:|:-------------------:|:---------:|:---------:|:---------:|:---------------------------------------:|:---------:|:----------:|:---------------------------------------------------:|:----------:|
+| PFC1    | PFC | accessible\_regions | PFC      | PFC      | 1         | D:/brain/brain/final/mouse/SRR14362276\.final\.bam |           |            | D:/brain/brain/macs2_peaks/mouse/SRR14362276\_peaks\.narrowPeak | narrowPeak |
+| PFC2    | PFC | accessible\_regions | PFC      | PFC      | 2         | D:/brain/brain/final/mouse/SRR14362281\.final\.bam |           |            | D:/brain/brain/macs2_peaks/mouse/SRR14362281\_peaks\.narrowPeak | narrowPeak |
+| PFC3      | PFC    | accessible\_regions | PFC        | PFC        | 3         | D:/brain/brain/final/mouse/SRR14362282\.final\.bam |           |            | D:/brain/brain/macs2_peaks/mouse/SRR14362282\_peaks\.narrowPeak | narrowPeak |
+| cortex1      | cortex    | accessible\_regions | cortex        | cortex        | 1         |  D:/brain/brain/final/mouse/SRR13049359\.final\.bam |           |            | D:/brain/brain/macs2_peaks/mouse/SRR13049359\_peaks\.narrowPeak | narrowPeak |  
+| cortex2      | cortex    | accessible\_regions | cortex        | cortex        | 2         |  D:/brain/brain/final/mouse/SRR13049361\.final\.bam |           |            | D:/brain/brain/macs2_peaks/mouse/SRR13049361\_peaks\.narrowPeak | narrowPeak |
+| HIPP1      | HIPP    | accessible\_regions | HIPP        | HIPP        | 1         |  D:/brain/brain/final/mouse/SRR11179779\.final\.bam |           |            | D:/brain/brain/macs2_peaks/mouse/SRR11179779\_peaks\.narrowPeak | narrowPeak |
+| HIPP2      | HIPP    | accessible\_regions | HIPP        | HIPP        | 2         |  D:/brain/brain/final/mouse/SRR11179780\.final\.bam |           |            | D:/brain/brain/macs2_peaks/mouse/SRR11179780\_peaks\.narrowPeak | narrowPeak |
+| HIPP3      | HIPP    | accessible\_regions | HIPP        | HIPP        | 3         |  D:/brain/brain/final/mouse/SRR11179781\.final\.bam |           |            | D:/brain/brain/macs2_peaks/mouse/SRR11179781\_peaks\.narrowPeak | narrowPeak |
+
+
+将上面表格写入文件`/mnt/d/brain/brain/R_analyse/mouse/sample_sheet.csv`，学会使用[格式转换器](https://tableconvert.com/zh-cn/csv-to-excel)，注意csv文件最后一行加一行空格，否则报错。注意删掉斜杠，写入csv不能有斜杠。
+
+
+
+
+* 代码：
+
+```r
+# 在 R.studio 中进行操作
+# 下载R包
+BiocManager::install("DiffBind", force = TRUE)
+library(DiffBind)
+# DiffBind 3.8.4
+getwd()
+# [1] "D:/brain/brain/R_analyse"
+
+
+# 导入数据
+> samples <- read.csv("./sample_sheet.csv")
+> names(samples)
+#  [1] "SampleID"   "Tissue"     "Factor"     "Condition"  "Treatment" 
+#  [6] "Replicate"  "bamReads"   "ControlID"  "bamControl" "Peaks"     
+# [11] "PeakCaller"
+
+#找到样本间共有peaks，比较相似性
+> dbObj <- dba(sampleSheet = samples)  
+> dbObj
+# 8 Samples, 180339 sites in matrix (265042 total):
+#        ID Tissue             Factor Condition Treatment Replicate Intervals
+# 1    PFC1    PFC accessible_regions       PFC       PFC         1    143526
+# 2    PFC2    PFC accessible_regions       PFC       PFC         2    146365
+# 3    PFC3    PFC accessible_regions       PFC       PFC         3    119528
+# 4 cortex1 cortex accessible_regions    cortex    cortex         1    144230
+# 5 cortex2 cortex accessible_regions    cortex    cortex         2    223038
+# 6   HIPP1   HIPP accessible_regions      HIPP      HIPP         1     75243
+# 7   HIPP2   HIPP accessible_regions      HIPP      HIPP         2     84122
+# 8   HIPP3   HIPP accessible_regions      HIPP      HIPP         3     66794
+``` 
+* 结果解读：    
+
+This shows how many peaks are in each peakset, as well as (in the first line) the total number of unique peaks after merging overlapping ones (`265042`), and the dimensions of the default binding matrix of `8` samples by the `180339` sites that overlap in at least two of the samples.
+
+* heatmap: 生成一个相关热图，利用矩阵的每一行的互相关联cross-correlations来给出样本的初始聚类  
+```r
+> plot(dbObj)
+```
+
+
+② Counting reads and creating a binding affinity matrix    
+
+* 原理：   
+The next step is to calculate a binding matrix with scores based on read counts for every sample (affinity scores), rather than confidence scores for only those peaks called in a specific sample (occupancy scores). 一旦一个 `consensus peak` 被推导出来，DiffBind可以使用提供的测序read文件来计算每个样本的每个区间有多少reads重叠。默认情况下，为了提供更多标准化的峰值区间，consensus peak中的峰会根据其峰值(最大读重叠点)重新调整中心点和trimmed。计数的最终结果是一个结合亲和矩阵，其中包含每个样本在每个共识结合位点的read count.  
+
+
+* [具体参数](https://rdrr.io/bioc/DiffBind/man/dba.count.html)  
+
+* 代码：  
+
+```r
+> db_count <- dba.count(dbObj)  #this step will take you a couple of minutes, be patient.
+# 8 Samples, 180205 sites in matrix:
+#        ID Tissue             Factor Condition Treatment Replicate    Reads FRiP
+# 1    PFC1    PFC accessible_regions       PFC       PFC         1 39421908 0.25
+# 2    PFC2    PFC accessible_regions       PFC       PFC         2 31444995 0.28
+# 3    PFC3    PFC accessible_regions       PFC       PFC         3 30715211 0.22
+# 4 cortex1 cortex accessible_regions    cortex    cortex         1  5826216 0.51
+# 5 cortex2 cortex accessible_regions    cortex    cortex         2 31773714 0.43
+# 6   HIPP1   HIPP accessible_regions      HIPP      HIPP         1 11534423 0.20
+# 7   HIPP2   HIPP accessible_regions      HIPP      HIPP         2 27587078 0.16
+# 8   HIPP3   HIPP accessible_regions      HIPP      HIPP         3 17589852 0.15
+```
+
+* 添加参数：  
+`bUseSummarizeOverlaps`，这个参数会使得运行比较缓慢，但是是一个更标准的计算功能。如果你把它设置为TRUE，所有的read文件必须是bam，并且必须有其自己的索引文件 (.bam.bai) 。另外fragmentSize参数必须是缺省值。
+```r
+> db_count2 <- dba.count(dbObj,bUseSummarizeOverlaps=TRUE)
+> db_count2
+# 8 Samples, 180205 sites in matrix:
+#        ID Tissue             Factor Condition Treatment Replicate    Reads FRiP
+# 1    PFC1    PFC accessible_regions       PFC       PFC         1 39421908 0.25
+# 2    PFC2    PFC accessible_regions       PFC       PFC         2 31444995 0.28
+# 3    PFC3    PFC accessible_regions       PFC       PFC         3 30715211 0.22
+# 4 cortex1 cortex accessible_regions    cortex    cortex         1  5826216 0.51
+# 5 cortex2 cortex accessible_regions    cortex    cortex         2 31773714 0.43
+# 6   HIPP1   HIPP accessible_regions      HIPP      HIPP         1 11534423 0.20
+# 7   HIPP2   HIPP accessible_regions      HIPP      HIPP         2 27587078 0.16
+# 8   HIPP3   HIPP accessible_regions      HIPP      HIPP         3 17589852 0.15 
+
+> dba.plotPCA(db_count2, attributes=DBA_TREATMENT, label=DBA_ID)
+> plot(db_count2)
+```
+
+
+
+* 通过 `dba.show` 命令整合：  
+```r
+> info <- dba.show(db_count2)
+> libsizes <- cbind(LibReads=info$Reads, FRiP=info$FRiP, PeakReads=round(info$Reads * info$FRiP))
+> rownames(libsizes) <- info$ID
+> libsizes
+#         LibReads FRiP PeakReads
+# PFC1    39421908 0.25   9855477
+# PFC2    31444995 0.28   8804598
+# PFC3    30715211 0.22   6757346
+# cortex1  5826216 0.51   2971370
+# cortex2 31773714 0.43  13662697
+# HIPP1   11534423 0.20   2306885
+# HIPP2   27587078 0.16   4413932
+# HIPP3   17589852 0.15   2638478
+```
 
 
 
