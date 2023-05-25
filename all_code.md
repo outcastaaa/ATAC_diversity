@@ -1,3 +1,14 @@
+- [1. 建目录](#1-建目录)
+- [2. 下载数据](#2-下载数据)
+- [3. 比对前质控](#3-比对前质控)
+- [4. 比对](#4-比对)
+- [5. 比对后过滤](#5-post-alignment-processing)
+- [6. Tn5转换](#6-shift-reads)
+- [7. call peak](#7-call-peaks)
+- [8. 可视化](#8-visualization)
+- [9. diffbind](#9-使用diffbind做主成分分析)
+
+
 # 1. 建目录
 ```bash
 cd /mnt/xuruizhi # 挂载到NAS
@@ -1020,6 +1031,7 @@ $ wc -l SRR13049361.Tn5.bed
 mkdir -p /mnt/d/ATAC/macs2_peaks/
 cd /mnt/d/ATAC/Tn5_shift/
 
+
 # 如果用的不是专门双端测序的bedpe，而是bed文件，采用下面代码
 # 单个样本
 mkdir -p /mnt/xuruizhi/brain/macs2_peaks/mouse
@@ -1051,6 +1063,47 @@ do echo $id
 done
 mkdir -p /mnt/d/brain/brain/macs2_peaks/mouse
 cp /mnt/xuruizhi/brain/macs2_peaks/mouse/* /mnt/d/brain/brain/macs2_peaks/mouse/
+# 此参数peak 7万
+
+# 使用新的参数call peak试试
+mkdir -p /mnt/xuruizhi/brain/macs2_peaks_new/mouse
+cd /mnt/xuruizhi/brain/Tn5_shift/mouse
+cat name_new.list | while read id;
+do 
+  echo $id 
+  arr=($id)
+  sample=${arr[0]}
+
+  macs2 callpeak  -g mm \
+  --nomodel --call-summits --nolambda --keep-dup all -p 0.01 \
+  --shift -75 --extsize 150 -n ${sample} -t ./${sample}.Tn5.bed \
+  --outdir /mnt/d/ATAC/macs2_peaks2_new/ 
+  # --keep-dup all会保留所有开头结尾相同的peak，不加
+done
+mkdir -p /mnt/d/brain/brain/macs2_peaks_new/mouse
+cp /mnt/d/ATAC/macs2_peaks2_new/* /mnt/d/brain/brain/macs2_peaks_new/mouse/
+cp /mnt/d/ATAC/macs2_peaks2_new/* /mnt/xuruizhi/brain/macs2_peaks_new/mouse/
+# 此参数peak 24万
+
+
+
+# 以此peak为准
+mkdir -p /mnt/xuruizhi/brain/macs2_peaks_final/mouse
+cd /mnt/xuruizhi/brain/Tn5_shift/mouse
+cat name_new.list | while read id;
+do 
+  echo $id 
+  arr=($id)
+  sample=${arr[0]}
+
+  macs2 callpeak  -g mm \
+  --shift -75 --extsize 150 --nomodel \
+  --nolambda --keep-dup all \
+  -n ${sample} -t ./${sample}.Tn5.bed \
+  --outdir /mnt/xuruizhi/brain/macs2_peaks_final_rm/mouse 
+done
+mkdir -p /mnt/d/brain/brain/macs2_peaks_final/mouse
+cp /mnt/xuruizhi/brain/macs2_peaks_final/mouse/*  /mnt/d/brain/brain/macs2_peaks_final/mouse/
 ```
 
 # 8. Visualization    
@@ -1076,7 +1129,8 @@ do
   --centerReads 
   # 1 > ../../bw/mouse/${id%%.*}_bamCoverage.log
 done
-
+mkdir -p /mnt/d/brain/brain/bw/mouse
+cp /mnt/xuruizhi/brain/bw/mouse/*  /mnt/d/brain/brain/bw/mouse/
 # bamCoverage注意大小写
 # --binSize Size of the bins, in bases, for the output of the bigwig/bedgraph file. (Default: 50)
 # --smoothLength The smooth length defines a window, larger than the binSize, to average the number of reads.
@@ -1207,7 +1261,7 @@ plotProfile -m /mnt/d/ATAC/genebody/SRR11539111_matrix.gz \
     -out /mnt/d/ATAC/genebody/SRR11539111_profile.png 
     #不太好看，还需要调整参数
 ```
-
+# 
 
 # 9. 使用diffbind做主成分分析
 
