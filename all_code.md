@@ -1658,20 +1658,80 @@ cp ./*_pool_merge.bed /mnt/xuruizhi/brain/common_peak/mouse
 ```bash
 # 以HIPP当作A文件
 cd /mnt/xuruizhi/brain/common_peak/mouse
-bedtools intersect -wa -wb -r \
--a HIPP_pool_merge.bed -b PFC_pool_merge.bed \
+
+# 方法1：a&b，a&c相交长度都占该长度的50%以上，取全长merge
+bedtools intersect -wa -wb -r -a HIPP_pool_merge.bed -b PFC_pool_merge.bed \
 -sorted -f 0.5 > HIPP-PFC.bed
+# chr1    3119067 3120708 chr1    3119482 3120938
+# chr1    3670267 3672643 chr1    3670275 3672668
+bedtools intersect -wa -wb -r -a HIPP_pool_merge.bed -b cortex_pool_merge.bed \
+-sorted -f 0.5 > HIPP-cortex.bed
+# chr1    3119067 3120708 chr1    3119412 3120936
+# chr1    4089410 4090009 chr1    4089409 4090300
 
-# bedtools intersect -wa -wb -r \
--a HIPP_pool_merge.bed -b PFC_pool_merge.bed \
--sorted -f 0.5 > HIPP-PFC.bed
+# 方法2：和方法1相同，可以直接-b放入多个文件解决
+bedtools intersect -wa -wb -r -a HIPP_pool_merge.bed -b PFC_pool_merge.bed cortex_pool_merge.bed -sorted -f 0.5  > all.bed
+# chr1    3119067 3120708 1       chr1    3119482 3120938
+# chr1    3119067 3120708 2       chr1    3119412 3120936
+# chr1    3670267 3672643 1       chr1    3670275 3672668
+# 和单独对比结果相同，而且会标注多重复区间
 
 
+# 看一下peak长度
+cat all.bed | awk '{print $1, $2, $3, ($3- $2), $6, $7, ($7-$6) > "peak_length.txt"}'
+# chr1 3119067 3120708 1641 3119482 3120938 1456
+# chr1 3119067 3120708 1641 3119412 3120936 1524
+# chr1 3670267 3672643 2376 3670275 3672668 2393
+# chr1 4089410 4090009 599 4089488 4090051 563
+# 该方法使得peak太长了
+
+
+# 方法3：只取a&b，a&c，b&c相交长度占总长的50%以上的部分，再merge，更合理一些
+# 本质上还是这三个peak，只不过peak长度大大缩短，只保留了重叠部分再merge
+## a&(b+c)
+bedtools intersect -a HIPP_pool_merge.bed -b PFC_pool_merge.bed cortex_pool_merge.bed -sorted -f 0.5 > 1HIPP_PFCcortex_0.5.bed
+# 此方法与all.bed结果核对，发现只能显示a&b,a&c的相交部分√
+## b&c
+bedtools intersect -a cortex_pool_merge.bed -b PFC_pool_merge.bed -sorted -f 0.5 > 2cortex_PFC_0.5.bed
+## merge
+cat *_0.5.bed > 3all_0.5.bed
+sort -k1,1 -k2,2n 3all_0.5.bed > 3all_sort_0.5.bed
+bedtools merge -i 3all_sort_0.5.bed -d 50 > 4all_merge_0.5.bed
+# 统计一下peak长度，长度也很合适
+cat 4all_merge_0.5.bed | awk '{print $1, $2, $3, ($3-$2) > "5all_merge_0.5.txt"}'
+# 得到的5all_merge_0.5.txt文件即为三个组织中共有peak
+```
+* 其他：  
+-c 参数会把a与b,c的重叠部分都报道出来，可以帮助统计a独有peak。  
+```bash
+# HIPP
+# -c
+bedtools intersect -wa -c -r -a HIPP_pool_merge.bed -b PFC_pool_merge.bed cortex_pool_merge.bed -sorted -f 0.5  | head
+# chr1    3119067 3120708 2
+# chr1    3670267 3672643 1
+...
+# chr1    5082637 5083669 2
+# chr1    5242978 5243687 0 只统计不相交为0的就好
+## -wao也可以达到相同效果
 bedtools intersect -wao -r -a HIPP_pool_merge.bed -b PFC_pool_merge.bed cortex_pool_merge.bed -sorted -f 0.5  | head
 
-bedtools intersect -wa  -r -a HIPP_pool_merge.bed -b PFC_pool_merge.bed cortex_pool_merge.bed -sorted -f 0.5 -wb | head
-#会把a与b,c的重叠部分都报道出来
+# 统计完全不相交+相交但不到50%的
+bedtools intersect -wa -c -r -a HIPP_pool_merge.bed -b PFC_pool_merge.bed cortex_pool_merge.bed -sorted -f 0.5  > 6HIPP_0.5.bed
+tsv-filter  --is-numeric 4 --eq 4:0 6HIPP_0.5.bed > 7HIPP_diff0.5.bed
+# 2347 7HIPP_diff0.5.bed 
+
+# 统计完全不相交的
+bedtools intersect -a HIPP_pool_merge.bed -b PFC_pool_merge.bed cortex_pool_merge.bed -sorted -v > 8HIPP_totaldiff0.5.bed
+# 1475 8HIPP_totaldiff0.5.bed
+
+# cortex
+
+
+
+
+
 ```
+
 ## 10.2 以A文件为主
 
 
