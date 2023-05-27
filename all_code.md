@@ -6,9 +6,8 @@
 - [6. Tn5转换](#6-shift-reads)
 - [7. call peak](#7-call-peaks)
 - [8. 可视化](#8-visualization)
-- [9. idr寻找rep间consensus peak](#9-寻找rep间consensus-peak)  
-
-- [8. 可视化](#8-visualization)
+- [9. 相同组织rep间consensus peak](#9-寻找rep间consensus-peak)  
+- [10. 不同组织可重复peak](#10-不同组织可重复peak)  
 - [9. diffbind](#9-使用diffbind做主成分分析)
 
 
@@ -1432,7 +1431,7 @@ idr --samples ./SRR11179780_peaks.narrowPeak.8thsorted ./SRR11179781_peaks.narro
 * !注意：务必在(py3.8)的conda环境中使用idr，否则报错  
 
 * 最终完整代码：   
-
+① HIPP
 ```bash
 # Sort peak by -log10(p-value)
 mkdir -p /mnt/xuruizhi/brain/IDR_final/mouse
@@ -1445,7 +1444,6 @@ sort -k8,8nr {1} > /mnt/xuruizhi/brain/IDR_final/mouse/{1}.8thsorted
 # HIPP:SRR111..79-80-81
 ## HIPP:81-80
 cd /mnt/xuruizhi/brain/IDR_final/mouse
-
 idr --samples SRR11179780_peaks.narrowPeak.8thsorted SRR11179781_peaks.narrowPeak.8thsorted \
 --input-file-type narrowPeak \
 --rank p.value \
@@ -1468,9 +1466,149 @@ idr --samples SRR11179779_peaks.narrowPeak.8thsorted SRR11179781_peaks.narrowPea
 --log-output-file HIPP79-81_0.05.log \
 --plot
 cp /mnt/xuruizhi/brain/IDR_final/mouse/* /mnt/d/brain/brain/IDR_final/mouse/
+## HIPP:79-80
+idr --samples SRR11179779_peaks.narrowPeak.8thsorted SRR11179780_peaks.narrowPeak.8thsorted \
+--input-file-type narrowPeak \
+--rank p.value \
+--soft-idr-threshold 0.05 \
+--use-best-multisummit-IDR \
+--output-file HIPP79-80_0.05.txt \
+--log-output-file HIPP79-80_0.05.log \
+--plot
+
+
+# 筛选出IDR<0.05，IDR=0.05, int(-125log2(0.05)) = 540，即第五列>=540
+awk '{if($5 >= 540) print $0}' HIPP79-81_0.05.txt > HIPP79-81_IDR0.05.txt
+awk '{if($5 >= 540) print $0}' HIPP80-81_0.05.txt > HIPP80-81_IDR0.05.txt
+awk '{if($5 >= 540) print $0}' HIPP79-80_0.05.txt > HIPP79-80_IDR0.05.txt
+  #  75858 HIPP79-80_0.05.txt
+  #  16814 HIPP79-80_IDR0.05.txt
+  #  62009 HIPP79-81_0.05.txt
+  #  11862 HIPP79-81_IDR0.05.txt
+  #  66547 HIPP80-81_0.05.txt
+  #  14763 HIPP80-81_IDR0.05.txt
+
+# 合并三组peak
+cut -f 1,2,3 HIPP79-80_IDR0.05.txt > HIPP79-80_IDR0.05.bed
+cut -f 1,2,3 HIPP79-81_IDR0.05.txt > HIPP79-81_IDR0.05.bed
+cut -f 1,2,3 HIPP80-81_IDR0.05.txt > HIPP80-81_IDR0.05.bed
+cat HIPP*_IDR0.05.bed | grep -v "chrUn_*" | grep -v "chrY"  > HIPP_pool.bed
+$ wc -l *.bed
+  # 16814 HIPP79-80_IDR0.05.bed
+  # 11862 HIPP79-81_IDR0.05.bed
+  # 14763 HIPP80-81_IDR0.05.bed
+  # 43356 HIPP_pool.bed
+sort -k1,1 -k2,2n HIPP_pool.bed > HIPP_pool_sort.bed
+bedtools merge -i HIPP_pool_sort.bed -d 50 > HIPP_pool_merge.bed
+wc -l  HIPP_pool_merge.bed
+#  21531 HIPP_pool_merge.bed
 ```
 
-5. 结果解读：  
+② cortex
+```bash
+# Sort peak by -log10(p-value)
+cd /mnt/xuruizhi/brain/macs2_peaks_final/mouse
+
+# SRR130..59-61
+cd /mnt/xuruizhi/brain/IDR_final/mouse
+idr --samples SRR13049359_peaks.narrowPeak.8thsorted SRR13049361_peaks.narrowPeak.8thsorted \
+--input-file-type narrowPeak \
+--rank p.value \
+--soft-idr-threshold 0.05 \
+--use-best-multisummit-IDR \
+--output-file cortex59-61_0.05.txt \
+--log-output-file cortex59-61_0.05.log \
+--plot
+
+
+# 筛选出IDR<0.05，IDR=0.05, int(-125log2(0.05)) = 540，即第五列>=540
+awk '{if($5 >= 540) print $0}' cortex59-61_0.05.txt > cortex59-61_IDR0.05.txt 
+$ wc -l cortex*.txt
+  # 143514 cortex59-61_0.05.txt
+  #  45284 cortex59-61_IDR0.05.txt
+
+cut -f 1,2,3 cortex59-61_IDR0.05.txt  > cortex59-61_IDR0.05.bed
+cat cortex59-61_IDR0.05.bed | grep -v "chrUn_*" | grep -v "chrY"  > cortex_pool.bed
+sort -k1,1 -k2,2n cortex_pool.bed > cortex_pool_sort.bed
+bedtools merge -i cortex_pool_sort.bed -d 50 > cortex_pool_merge.bed
+$ wc -l cortex*.bed
+  # 45284 cortex59-61_IDR0.05.bed
+  # 45273 cortex_pool.bed
+  # 45265 cortex_pool_merge.bed
+  # 45273 cortex_pool_sort.bed
+```
+③ PFC
+```bash
+# SRR143..76-81-82
+## PFC:76-81
+cd /mnt/xuruizhi/brain/IDR_final/mouse
+idr --samples SRR14362276_peaks.narrowPeak.8thsorted SRR11179781_peaks.narrowPeak.8thsorted \
+--input-file-type narrowPeak \
+--rank p.value \
+--soft-idr-threshold 0.05 \
+--use-best-multisummit-IDR \
+--output-file PFC76-81_0.05.txt \
+--log-output-file PFC76-81_0.05.log \
+--plot
+
+## PFC:76-82
+cd /mnt/xuruizhi/brain/IDR_final/mouse
+idr --samples SRR14362276_peaks.narrowPeak.8thsorted SRR14362282_peaks.narrowPeak.8thsorted \
+--input-file-type narrowPeak \
+--rank p.value \
+--soft-idr-threshold 0.05 \
+--use-best-multisummit-IDR \
+--output-file PFC76-82_0.05.txt \
+--log-output-file PFC76-82_0.05.log \
+--plot
+
+## PFC:81-82
+cd /mnt/xuruizhi/brain/IDR_final/mouse
+idr --samples SRR14362281_peaks.narrowPeak.8thsorted SRR14362282_peaks.narrowPeak.8thsorted \
+--input-file-type narrowPeak \
+--rank p.value \
+--soft-idr-threshold 0.05 \
+--use-best-multisummit-IDR \
+--output-file PFC81-82_0.05.txt \
+--log-output-file PFC81-82_0.05.log \
+--plot
+
+awk '{if($5 >= 540) print $0}' PFC76-81_0.05.txt > PFC76-81_IDR0.05.txt
+awk '{if($5 >= 540) print $0}' PFC76-82_0.05.txt > PFC76-82_IDR0.05.txt
+awk '{if($5 >= 540) print $0}' PFC81-82_0.05.txt > PFC81-82_IDR0.05.txt
+  #  76804 PFC76-81_0.05.txt
+  #  14501 PFC76-81_IDR0.05.txt
+  # 133102 PFC76-82_0.05.txt
+  #  50196 PFC76-82_IDR0.05.txt
+  # 131879 PFC81-82_0.05.txt
+  #  48522 PFC81-82_IDR0.05.txt
+
+# 合并两peak
+cut -f 1,2,3 PFC76-81_IDR0.05.txt > PFC76-81_IDR0.05.bed
+cut -f 1,2,3 PFC76-82_IDR0.05.txt > PFC76-82_IDR0.05.bed
+cut -f 1,2,3 PFC81-82_IDR0.05.txt > PFC81-82_IDR0.05.bed
+
+cat PFC*_IDR0.05.bed | grep -v "chrUn_*" | grep -v "chrY"  > PFC_pool.bed
+$ wc -l *.bed
+  #  14501 PFC76-81_IDR0.05.bed
+  #  50196 PFC76-82_IDR0.05.bed
+  #  48522 PFC81-82_IDR0.05.bed
+  # 113174 PFC_pool.bed
+sort -k1,1 -k2,2n PFC_pool.bed > PFC_pool_sort.bed
+bedtools merge -i PFC_pool_sort.bed -d 50 > PFC_pool_merge.bed
+wc -l  PFC_pool_merge.bed
+#  58240 PFC_pool_merge.bed
+```
+```bash
+# 统计peak长度
+cat PFC_pool_merge.bed | perl -ne '
+chomp;
+my @info = split( /\t/, $_ );
+my $result = ( $info[2] - $info[1] );
+print "$_\t$result\n";
+' | head
+```
+4. 结果解读：  
 
 默认情况下统计IDR < 0.05的peak, 0.05 IDR means that peak has a 5% chance of being an irreproducible discovery。  
 通过IDR软件可以很方便的处理生物学重复样本的peak calling结果，筛选出一组一致性高的peak。  
@@ -1487,11 +1625,6 @@ chr16   11143929        11144303        .       1000    .       -1      622.3336
 
 
 * 图片  
-![12.idr.png](./pictures/12_pvalue.txt.png)  
- 
-![56.idr.png](./pictures/56_pvalue.txt.png)    
-
-
 
 Upper Left: Replicate 1 peak ranks versus replicate 2 peak ranks - peaks that do not pass the specified idr threshold are colered red.黑色的才是要找的IDR<0.05的可重复（共有的）peak。    
 
@@ -1500,33 +1633,46 @@ Upper Right: Replicate 1 log10 peak scores versus replicate 2 log10 peak scores 
 Bottom Row: Peaks rank versus idr scores are plotted in black. The overlayed boxplots display the distribution of idr values in each 5% quantile. The idr values are thresholded at the optimization precision - 1e-6 bny default.  
 
 
-* 计算common peaks
+* 计算common peaks  
+
+已经保存在文档中。
+| **物种**                         | **HIPP（3）**                                                   | **Cortex（2）**              | **PFC（3）**                                                                      | **DG（1）**  |
+|--------------------------------|---------------------------------------------------------------|----------------------------|---------------------------------------------------------------------------------|------------|
+| 小鼠                             | SRR111..79-80-81                                              | SRR130..59-61              | SRR143..76-81-82                                                                | SRR359..13 |
+| Peak数                          | 131,886,126,857,111,000                                       | 174,276,249,480            | 203,466,199,755,169,000                                                         | 58525      |
+| IDR peak数目（IDR cutoff of 0.05） | 80-81：14757/66547，79-81：11856/62009，79-80：16805/75858 (22.2%) | 59-61：45264/143514 (31.5%) | 76-81：14492/76804 (18.9%)，81-82：48509/131879 (36.8%)，76-82：50184/133102 (37.7%) |            |
+| peak数                          | 21531                                                         | 45265                      | 58240                                                                           | 58525         |
+
+# 10. 不同组织可重复peak
+## 10.1 A，B，C重叠部分
+1. 原理：比较两个文件的peak，有三种情况：长度相差不大，可以直接根据重叠比例确定；query文件比B文件peak长，重叠A的50%也可以；当query文件的peak比较短时，该情况可能存在A peak可能只占B的20%，但却是A的100%的情况，这样就不可算作一个peak。要加上参数-r。  
+
+2. 代码：
 ```bash
-# 单个样本的peak总数
- wc -l *.narrowPeak
-  # 16974 SRR11539111_peaks.narrowPeak
-  # 16136 SRR11539112_peaks.narrowPeak
-  # 20384 SRR11539115_peaks.narrowPeak
-  # 19063 SRR11539116_peaks.narrowPeak
-  # 72557 total
-
-# 核算common peaks的总数，该数据未更新
-wc -l *.txt
-  # 13340 12_pvalue.txt
-  # 13340 12_signal_value.txt
-  # 15709 56_pvalue.txt
-  # 15709 56_signal_value.txt
-# 相当于 样本1和2有13340个overlap的peaks，样本5和6有15709个overlap的peaks
-# 不管用什么排序方法，commonpeak都是一样的，但是其他数据都不同；下面采用pvalue排序文件
-
-# 筛选出IDR<0.05，IDR=0.05, int(-125log2(0.05)) = 540，即第五列>=540
-awk '{if($5 >= 540) print $0}' 12_pvalue.txt > 12_IDR0.05.txt
-wc -l 12_IDR0.05.txt #9716
-awk '{if($5 >= 540) print $0}' 56_pvalue.txt > 56_IDR0.05.txt
-wc -l 56_IDR0.05.txt #11520
-# 因此两组处理两两重复之间各有9716、11520个consensus peak
+# 每个组织的common peak
+mkdir -p /mnt/xuruizhi/brain/common_peak/mouse
+cd /mnt/xuruizhi/brain/IDR_final/mouse
+cp ./*_pool_merge.bed /mnt/xuruizhi/brain/common_peak/mouse
 ```
+① 重叠50%  
+```bash
+# 以HIPP当作A文件
+cd /mnt/xuruizhi/brain/common_peak/mouse
+bedtools intersect -wa -wb -r \
+-a HIPP_pool_merge.bed -b PFC_pool_merge.bed \
+-sorted -f 0.5 > HIPP-PFC.bed
 
+# bedtools intersect -wa -wb -r \
+-a HIPP_pool_merge.bed -b PFC_pool_merge.bed \
+-sorted -f 0.5 > HIPP-PFC.bed
+
+
+bedtools intersect -wao -r -a HIPP_pool_merge.bed -b PFC_pool_merge.bed cortex_pool_merge.bed -sorted -f 0.5  | head
+
+bedtools intersect -wa  -r -a HIPP_pool_merge.bed -b PFC_pool_merge.bed cortex_pool_merge.bed -sorted -f 0.5 -wb | head
+#会把a与b,c的重叠部分都报道出来
+```
+## 10.2 以A文件为主
 
 
 # 9. 使用diffbind做主成分分析
