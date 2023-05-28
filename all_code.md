@@ -1650,14 +1650,14 @@ Bottom Row: Peaks rank versus idr scores are plotted in black. The overlayed box
 2. 代码：
 ```bash
 # 每个组织的common peak
-mkdir -p /mnt/xuruizhi/brain/common_peak/mouse
+mkdir -p /mnt/xuruizhi/brain/common_peak/0.5/mouse
 cd /mnt/xuruizhi/brain/IDR_final/mouse
-cp ./*_pool_merge.bed /mnt/xuruizhi/brain/common_peak/mouse
+cp ./*_pool_merge.bed /mnt/xuruizhi/brain/common_peak/0.5/mouse
 ```
 ① 重叠50%  
 ```bash
 # 以HIPP当作A文件
-cd /mnt/xuruizhi/brain/common_peak/mouse
+cd /mnt/xuruizhi/brain/common_peak/0.5/mouse
 
 # 方法1：a&b，a&c相交长度都占该长度的50%以上，取全长merge
 bedtools intersect -wa -wb -r -a HIPP_pool_merge.bed -b PFC_pool_merge.bed \
