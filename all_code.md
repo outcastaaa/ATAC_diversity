@@ -1702,9 +1702,9 @@ cat 4all_merge_0.5.bed | awk '{print $1, $2, $3, ($3-$2) > "5all_merge_0.5.txt"}
 # 得到的5all_merge_0.5.txt文件即为三个组织中共有peak
 ```
 * 其他：  
--c 参数会把a与b,c的重叠部分都报道出来，可以帮助统计a独有peak。  
+-c 参数会把a与b,c的重叠部分都报道出来，可以帮助统计a独有peak。 
+* HIPP 
 ```bash
-# HIPP
 # -c
 bedtools intersect -wa -c -r -a HIPP_pool_merge.bed -b PFC_pool_merge.bed cortex_pool_merge.bed -sorted -f 0.5  | head
 # chr1    3119067 3120708 2
@@ -1714,26 +1714,159 @@ bedtools intersect -wa -c -r -a HIPP_pool_merge.bed -b PFC_pool_merge.bed cortex
 # chr1    5242978 5243687 0 只统计不相交为0的就好
 ## -wao也可以达到相同效果
 bedtools intersect -wao -r -a HIPP_pool_merge.bed -b PFC_pool_merge.bed cortex_pool_merge.bed -sorted -f 0.5  | head
-
 # 统计完全不相交+相交但不到50%的
 bedtools intersect -wa -c -r -a HIPP_pool_merge.bed -b PFC_pool_merge.bed cortex_pool_merge.bed -sorted -f 0.5  > 6HIPP_0.5.bed
 tsv-filter  --is-numeric 4 --eq 4:0 6HIPP_0.5.bed > 7HIPP_diff0.5.bed
 # 2347 7HIPP_diff0.5.bed 
-
 # 统计完全不相交的
 bedtools intersect -a HIPP_pool_merge.bed -b PFC_pool_merge.bed cortex_pool_merge.bed -sorted -v > 8HIPP_totaldiff0.5.bed
 # 1475 8HIPP_totaldiff0.5.bed
+```
+* cortex：
+```bash
+# -c
+bedtools intersect -wa -c -r -a cortex_pool_merge.bed -b PFC_pool_merge.bed HIPP_pool_merge.bed  -sorted -f 0.5  | head
 
-# cortex
+# 统计完全不相交+相交但不到50%的
+bedtools intersect -wa -c -r -a cortex_pool_merge.bed -b PFC_pool_merge.bed HIPP_pool_merge.bed  -sorted -f 0.5  > 9cortex_0.5.bed
+tsv-filter  --is-numeric 4 --eq 4:0 9cortex_0.5.bed > 10cortex_diff0.5.bed
+# 8397 10cortex_diff0.5.bed
 
-
-
-
-
+# 统计完全不相交的
+bedtools intersect -a cortex_pool_merge.bed -b PFC_pool_merge.bed HIPP_pool_merge.bed -sorted -v > 11cortex_totaldiff0.5.bed
+# 6368 11cortex_totaldiff0.5.bed
 ```
 
-## 10.2 以A文件为主
+* PFC：
+```bash
+# -c
+bedtools intersect -wa -c -r -a PFC_pool_merge.bed -b  HIPP_pool_merge.bed cortex_pool_merge.bed  -sorted -f 0.5  | head
 
+# 统计完全不相交+相交但不到50%的
+bedtools intersect -wa -c -r -a PFC_pool_merge.bed -b  HIPP_pool_merge.bed cortex_pool_merge.bed  -sorted -f 0.5  > 12PFC_0.5.bed
+tsv-filter  --is-numeric 4 --eq 4:0 12PFC_0.5.bed > 13PFC_diff0.5.bed
+# 18367 13PFC_diff0.5.bed
+
+# 统计完全不相交的
+bedtools intersect -a PFC_pool_merge.bed -b cortex_pool_merge.bed HIPP_pool_merge.bed -sorted -v > 14PFC_totaldiff0.5.bed
+# 16535 14PFC_totaldiff0.5.bed
+```
+② 重叠80% 
+```bash
+# 以HIPP当作A文件
+mkdir -p /mnt/xuruizhi/brain/common_peak/0.8/mouse
+cp /mnt/xuruizhi/brain/IDR_final/mouse/*_pool_merge.bed /mnt/xuruizhi/brain/common_peak/0.8/mouse
+cd /mnt/xuruizhi/brain/common_peak/0.8/mouse
+
+# 只取a&b，a&c，b&c相交长度占总长的80%以上的部分，再merge
+## a&(b+c)
+bedtools intersect -a HIPP_pool_merge.bed -b PFC_pool_merge.bed cortex_pool_merge.bed -sorted -f 0.8 > 1HIPP_PFCcortex_0.8.bed
+## b&c
+bedtools intersect -a cortex_pool_merge.bed -b PFC_pool_merge.bed -sorted -f 0.8 > 2cortex_PFC_0.8.bed
+## merge
+cat *_0.8.bed > 3all_0.8.bed
+sort -k1,1 -k2,2n 3all_0.8.bed > 3all_sort_0.8.bed
+bedtools merge -i 3all_sort_0.8.bed -d 50 > 4all_merge_0.8.bed
+# 统计一下peak长度，长度也很合适
+cat 4all_merge_0.8.bed | awk '{print $1, $2, $3, ($3-$2) > "5all_merge_0.8.txt"}'
+# 得到的5all_merge_0.8.txt文件即为三个组织中共有peak
+```
+* 其他：  
+* HIPP 
+```bash
+# 统计完全不相交+相交但不到80%的
+bedtools intersect -wa -c -r -a HIPP_pool_merge.bed -b PFC_pool_merge.bed cortex_pool_merge.bed -sorted -f 0.8  > 6HIPP_0.8.bed
+tsv-filter  --is-numeric 4 --eq 4:0 6HIPP_0.8.bed > 7HIPP_diff0.8.bed
+# 8250 7HIPP_diff0.8.bed
+
+# 统计完全不相交的
+bedtools intersect -a HIPP_pool_merge.bed -b PFC_pool_merge.bed cortex_pool_merge.bed -sorted -v > 8HIPP_totaldiff0.8.bed
+# 1475 8HIPP_totaldiff0.8.bed，不管是多少覆盖度都一样
+```
+* cortex：
+```bash
+# 统计完全不相交+相交但不到50%的
+bedtools intersect -wa -c -r -a cortex_pool_merge.bed -b PFC_pool_merge.bed HIPP_pool_merge.bed  -sorted -f 0.8  > 9cortex_0.8.bed
+tsv-filter  --is-numeric 4 --eq 4:0 9cortex_0.8.bed > 10cortex_diff0.8.bed
+# 21988 10cortex_diff0.8.bed
+
+# 统计完全不相交的
+bedtools intersect -a cortex_pool_merge.bed -b PFC_pool_merge.bed HIPP_pool_merge.bed -sorted -v > 11cortex_totaldiff0.8.bed
+# 6368 11cortex_totaldiff0.8.bed
+```
+
+* PFC：
+```bash
+# 统计完全不相交+相交但不到90%的
+bedtools intersect -wa -c -r -a PFC_pool_merge.bed -b  HIPP_pool_merge.bed cortex_pool_merge.bed  -sorted -f 0.8  > 12PFC_0.8.bed
+tsv-filter  --is-numeric 4 --eq 4:0 12PFC_0.8.bed > 13PFC_diff0.8.bed
+# 32632 13PFC_diff0.8.bed
+
+# 统计完全不相交的
+bedtools intersect -a PFC_pool_merge.bed -b cortex_pool_merge.bed HIPP_pool_merge.bed -sorted -v > 14PFC_totaldiff0.8.bed
+# 16535 14PFC_totaldiff0.8.bed
+```
+
+② 重叠90% 
+```bash
+# 以HIPP当作A文件
+mkdir -p /mnt/xuruizhi/brain/common_peak/0.9/mouse
+cp /mnt/xuruizhi/brain/IDR_final/mouse/*_pool_merge.bed /mnt/xuruizhi/brain/common_peak/0.9/mouse
+cd /mnt/xuruizhi/brain/common_peak/0.9/mouse
+
+# 只取a&b，a&c，b&c相交长度占总长的80%以上的部分，再merge
+## a&(b+c)
+bedtools intersect -a HIPP_pool_merge.bed -b PFC_pool_merge.bed cortex_pool_merge.bed -sorted -f 0.9 > 1HIPP_PFCcortex_0.9.bed
+## b&c
+bedtools intersect -a cortex_pool_merge.bed -b PFC_pool_merge.bed -sorted -f 0.9 > 2cortex_PFC_0.9.bed
+## merge
+cat *_0.9.bed > 3all_0.9.bed
+sort -k1,1 -k2,2n 3all_0.9.bed > 3all_sort_0.9.bed
+bedtools merge -i 3all_sort_0.9.bed -d 50 > 4all_merge_0.9.bed
+# 统计一下peak长度，长度也很合适
+cat 4all_merge_0.9.bed | awk '{print $1, $2, $3, ($3-$2) > "5all_merge_0.9.txt"}'
+# 得到的5all_merge_0.8.txt文件即为三个组织中共有peak
+```
+* 其他：  
+* HIPP 
+```bash
+# 统计完全不相交+相交但不到80%的
+bedtools intersect -wa -c -r -a HIPP_pool_merge.bed -b PFC_pool_merge.bed cortex_pool_merge.bed -sorted -f 0.9  > 6HIPP_0.9.bed
+tsv-filter  --is-numeric 4 --eq 4:0 6HIPP_0.9.bed > 7HIPP_diff0.9.bed
+# 14628 7HIPP_diff0.9.bed
+
+# 统计完全不相交的
+bedtools intersect -a HIPP_pool_merge.bed -b PFC_pool_merge.bed cortex_pool_merge.bed -sorted -v > 8HIPP_totaldiff0.9.bed
+# 1475 8HIPP_totaldiff0.9.bed
+```
+* cortex：
+```bash
+# 统计完全不相交+相交但不到50%的
+bedtools intersect -wa -c -r -a cortex_pool_merge.bed -b PFC_pool_merge.bed HIPP_pool_merge.bed  -sorted -f 0.9  > 9cortex_0.9.bed
+tsv-filter  --is-numeric 4 --eq 4:0 9cortex_0.9.bed > 10cortex_diff0.9.bed
+# 34173 10cortex_diff0.9.bed
+
+# 统计完全不相交的
+bedtools intersect -a cortex_pool_merge.bed -b PFC_pool_merge.bed HIPP_pool_merge.bed -sorted -v > 11cortex_totaldiff0.9.bed
+# 6368 11cortex_totaldiff0.9.bed
+```
+
+* PFC：
+```bash
+# 统计完全不相交+相交但不到90%的
+bedtools intersect -wa -c -r -a PFC_pool_merge.bed -b  HIPP_pool_merge.bed cortex_pool_merge.bed  -sorted -f 0.9 > 12PFC_0.9.bed
+tsv-filter  --is-numeric 4 --eq 4:0 12PFC_0.9.bed > 13PFC_diff0.9.bed
+#  45782 13PFC_diff0.9.bed
+
+# 统计完全不相交的
+bedtools intersect -a PFC_pool_merge.bed -b cortex_pool_merge.bed HIPP_pool_merge.bed -sorted -v > 14PFC_totaldiff0.8.bed
+# 16535 14PFC_totaldiff0.8.bed
+```
+## 10.2 以A文件为主
+```bash
+# 以HIPP为主
+bedtools intersect -wa -u -a HIPP_pool_merge.bed -b PFC_pool_merge.bed cortex_pool_merge.bed -sorted 
+```
 
 # 9. 使用diffbind做主成分分析
 
@@ -1954,16 +2087,45 @@ for (file_name in file_names) {
 # 现在，您可以通过列表中的名称访问读取的数据
 # 例如，访问第一个文件的数据：
 peak_list[["SRR3595213_summits.bed"]]
+```
 
 
 
+1. HIPP差异peak
+
+① 导入文件做基础分析  
+```bash
+mkdir -p /mnt/d/brain/brain/common_peak/
+cp -r /mnt/xuruizhi/brain/common_peak/*  /mnt/d/brain/brain/common_peak/
+
+```
+```r
+# Load libraries
+BiocManager::install("ChIPseeker")
+BiocManager::install("GenomicFeatures")
+BiocManager::install("TxDb.Mmusculus.UCSC.mm10.knownGene", force = TRUE)
+BiocManager::install("org.Mm.eg.db", force = TRUE)
+BiocManager::install("clusterProfiler", force = TRUE)
+
+library(ChIPseeker)
+library(GenomicFeatures)
+library(TxDb.Mmusculus.UCSC.mm10.knownGene)
+library(org.Mm.eg.db)
+library(clusterProfiler)
+
+
+# 导入bed文件
+> getwd()
+# [1] "D:/brain/brain/R_analyse"
+# 单个导入文件
+> HIPP_totaldiff <- readPeakFile("D:/brain/brain/common_peak/0.5/mouse/8HIPP_totaldiff0.5.bed",sep ="") 
 # peak在染色体上的分布
-> covplot(peak)
+> covplot(HIPP_totaldiff)
 
 # peak 在TSS位点附件的分布
 > txdb <- TxDb.Mmusculus.UCSC.mm10.knownGene
   promoter <- getPromoters(TxDb=txdb, upstream=1000, downstream=1000)
-  tagMatrix <- getTagMatrix(peak, windows=promoter)
+  tagMatrix <- getTagMatrix(HIPP_totaldiff, windows=promoter)
 > tagHeatmap(tagMatrix, xlim=c(-1000, 1000), color="red")
 > plotAvgProf(
   tagMatrix,
@@ -1972,68 +2134,101 @@ peak_list[["SRR3595213_summits.bed"]]
   ylab = "Peak Frequency")
 ```
 
-* 结果注释:    
-
-默认情况下，annotatePeak 函数使用 TSS 方法，并提供参数来指定最大距离截止。还可以报告此距离内的所有基因，无论是否与TSS重叠。对于注释基因组区域，当基因组区域为外显子或内含子时，annotatePeak 函数报告详细信息。例如，“外显子（uc002sbe.3/9736, exon 69 of 80）”意味着峰与转录本uc69sbe.80拥有的80个外显子的第69个外显子重叠，相应的Entrez基因ID为9736。   
-![peak_chrs](./pictures/peak_chrs.png)  
-![tss_heatmap](./pictures/tss_heatmap.png)   
-![tss_line](./pictures/tss_line.png)    
-
-
 ② peak关联基因注释  
 给出了关联的基因以及对应的基因组区域的类别，根据这个结果，可以提取关联基因进行下游的功能富集分析，比如提取geneid这一列，用clusterProfiler进行GO/KEGG等功能富集分析。  
 
 ```r
-> peakAnnolist <- annotatePeak(
-    peak,
+> HIPP_totaldiff_Annolist <- annotatePeak(
+    HIPP_totaldiff,
     tssRegion = c(-1000, 1000),
     TxDb = txdb,
     annoDb = "org.Mm.eg.db")
 # Annotated peaks generated by ChIPseeker
-# 8265/8265  peaks were annotated
+# 1475/1475  peaks were annotated
 # Genomic Annotation Summary:
-#              Feature   Frequency
-# 9           Promoter 82.92800968
-# 4             5' UTR  0.24198427
-# 3             3' UTR  0.54446461
-# 1           1st Exon  1.12522686
-# 7         Other Exon  0.96793708
-# 2         1st Intron  3.08529946
-# 8       Other Intron  4.69449486
-# 6 Downstream (<=300)  0.07259528
-# 5  Distal Intergenic  6.33998790
+#              Feature  Frequency
+# 9           Promoter 21.7627119
+# 4             5' UTR  0.4745763
+# 3             3' UTR  3.1864407
+# 1           1st Exon  1.6949153
+# 7         Other Exon  4.2033898
+# 2         1st Intron 10.4406780
+# 8       Other Intron 24.2033898
+# 6 Downstream (<=300)  0.1355932
+# 5  Distal Intergenic 33.8983051
 
 
 > write.table(
-    as.data.frame(peakAnnolist),
-    "diff_DESeq2peak.annotation.tsv",
+    as.data.frame(HIPP_totaldiff_Annolist),
+    "HIPP_totaldiff.annotation.tsv",
     sep="\t",
     row.names = F,
     quote = F)   
 
 #可视化
-> plotAnnoPie(peakAnnolist)
-> plotAnnoBar(peakAnnolist) 
-> plotDistToTSS(peakAnnolist,title="Distribution of accessible regions relative to TSS")
+> plotAnnoPie(HIPP_totaldiff_Annolist)
+> plotAnnoBar(HIPP_totaldiff_Annolist) 
+> plotDistToTSS(HIPP_totaldiff_Annolist,title="Distribution of accessible regions relative to TSS")
 ```  
 
-* 结果注释:   
+③ 基因ID转化  
 
-![peakpie](./pictures/peakpie.png)   
+```r
+# 提取差异基因
+> HIPP_totaldiffpeakAnno <- as.data.frame(HIPP_totaldiff_Annolist)
 
-可以看到染色质可及区域绝大部分分布在TSS区域。 结果： annotatePeak传入annoDb参数,即可进行基因ID转换，将Entrez ID转化为ENSEMBL，SYMBOL，GENENAME.  
+# 转换函数
+> ensembl_id_transform <- function(ENSEMBL_ID){
+    # geneID是输入的基因ID，fromType是输入的ID类型，toType是输出的ID类型，OrgDb注释的db文件，drop表示是否剔除NA数据
+    a = bitr(ENSEMBL_ID, fromType="ENSEMBL", toType=c("SYMBOL","ENTREZID"), OrgDb="org.Mm.eg.db")
+    return(a)
+}
+> HIPP_ensembl_id_transform <- ensembl_id_transform(HIPP_totaldiffpeakAnno$ENSEMBL)
+# 0.08% of input gene IDs are fail to map...
+
+# 写入文件
+> write.csv(ensembl_id_transform(HIPP_totaldiffpeakAnno$ENSEMBL), file="HIPP_totaldiffpeak_geneID.tsv", quote = F)
 
 
-```bash
-seqnames  start    end     width   strand   V4      V5            annotation          geneChr   geneStart    geneEnd geneLength    geneStrand   geneId  transcriptId         distanceToTSS   
-ENSEMBL                SYMBOL          GENENAME
-chr9    58807687 58808086   400     *       * -1.93607772246243   Distal Intergenic       9      58823412    58863175   39764           1       330953  ENSMUST00000034889.9    -15326 
- ENSMUSG00000032338      Hcn4    hyperpolarization-activated, cyclic nucleotide-gated K+ 4
+# 使用ClusterProfiler包进行转化有一部分部分没有映射到，换biomaRt包试一下
+BiocManager::install("biomaRt", force = TRUE)
+library(biomaRt)
+mart <- useDataset( "mmusculus_gene_ensembl", useMart("ENSEMBL_MART_ENSEMBL"))
+
+HIPP_biomart_ensembl_id_transform <- getBM(attributes=c("ensembl_gene_id","external_gene_name","entrezgene_id", "description"), \ #写入R需要删掉\
+filters = 'ensembl_gene_id', values = HIPP_totaldiffpeakAnno$ENSEMBL, mart = mart) # 转化了1294
+write.csv(biomart_ensembl_id_transform, file="biomart_diff_DESeq2peak_geneID.tsv", quote = F)
+# 不和上一个差不多
 ```
 
 
 
 
+④ 功能富集分析 
+选择biomark找到的基因进行分析   
+
+```r
+# Run GO enrichment analysis 
+HIPP_BP <- enrichGO(
+        gene = HIPP_ensembl_id_transform$ENTREZID, 
+        keyType = "ENTREZID",
+        OrgDb = org.Mm.eg.db, 
+        ont = "BP", 
+        pAdjustMethod = "BH", 
+        qvalueCutoff = 0.05, 
+        readable = TRUE)
+# bar visualization
+barplot(HIPP_BP, showCategory=40, font.size = 6, title = paste("The GO BP enrichment analysis", sep = ""))
+
+# Multiple samples KEGG analysis
+HIPP_kegg <- enrichKEGG(gene =
+        HIPP_ensembl_id_transform$ENTREZID,
+        organism = 'mmu',
+        pvalueCutoff = 0.05,
+        pAdjustMethod = "BH")
+barplot(HIPP_kegg, showCategory = 20, title = "KEGG Pathway Enrichment Analysis")
+```
+[很好的做GO分析的网站：GREAT](http://bejerano.stanford.edu/great/public/html/index.php)
 
 
 
