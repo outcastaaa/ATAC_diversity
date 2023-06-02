@@ -2304,6 +2304,83 @@ bedtools intersect -a PFC_pool_merge.bed -b cortex_pool_merge.bed HIPP_pool_merg
 # 以HIPP为主
 bedtools intersect -wa -u -a HIPP_pool_merge.bed -b PFC_pool_merge.bed cortex_pool_merge.bed -sorted 
 ```
+## 10.3 A,B,C重叠并取原来的peak ————以此为准
+只取a&b，a&c，b&c相交长度占总长的50%以上的部分，再取交集，看此交集对应的peak原位置  
+
+```bash
+# 建目录
+mkdir -p /mnt/xuruizhi/brain/common_peak_final/0.5/mouse
+mkdir -p /mnt/xuruizhi/brain/common_peak_final/0.8/mouse
+mkdir -p /mnt/xuruizhi/brain/common_peak_final/0.9/mouse
+
+cd /mnt/xuruizhi/brain/IDR_final/mouse
+cp ./*_pool_merge.bed /mnt/xuruizhi/brain/common_peak_final/0.5/mouse
+cp ./*_pool_merge.bed /mnt/xuruizhi/brain/common_peak_final/0.8/mouse
+cp ./*_pool_merge.bed /mnt/xuruizhi/brain/common_peak_final/0.9/mouse
+
+# 将间隔小于50bp的reads合并
+sort -k1,1 -k2,2n HIPP_pool_merge.bed > HIPP.bed
+bedtools merge -i HIPP.bed -d 50 > all.bed
+# 发现数目一样，还是使用HIPP_pool_merge.bed,其他也一样
+```
+① 重叠50% 
+```bash
+cd /mnt/xuruizhi/brain/common_peak_final/0.5/mouse
+# 只取a&b，a&c，b&c相交长度占总长的50%以上的部分，再取交集，看此交集对应的peak原位置
+## 计算两两相交占比大于50%的部分
+## a&b
+bedtools intersect -a HIPP_pool_merge.bed -b PFC_pool_merge.bed -sorted -f 0.5 -r > 1HIPP_PFC_0.5.bed  # 18064 1HIPP_PFC_0.5.bed
+## a&c
+bedtools intersect -a HIPP_pool_merge.bed -b cortex_pool_merge.bed -sorted -f 0.5 -r > 2HIPP_cortex_0.5.bed  # 14973 2HIPP_cortex_0.5.bed
+## b&c
+bedtools intersect -a cortex_pool_merge.bed -b PFC_pool_merge.bed -sorted -f 0.5 -r > 3cortex_PFC_0.5.bed  # 35612 3cortex_PFC_0.5.bed
+
+
+# 算出三个部分相交的小块，再看此交集对应的peak原位置
+## 1&2 取相交部分
+bedtools intersect -a 1HIPP_PFC_0.5.bed -b 2HIPP_cortex_0.5.bed > 4_12_0.5.bed  #  13853 4_12_0.5.bed
+## 把1&2相交部分再与3相交
+bedtools intersect -a 3cortex_PFC_0.5.bed -b 4_12_0.5.bed > 5_123_0.5.bed  #  13483 5_123_0.5.bed，此文件就是他们三个相交的共有区域
+
+## 使用bedtools intersect命令对HIPP_pool_merge.bed文件与5_123_0.5.bed文件进行交集计算，输出包含交集区域中的HIPP所有行，并且去除重复的行。输入文件已经按照染色体名称和位置进行了排序。
+bedtools intersect -wa -u -a HIPP_pool_merge.bed -b 5_123_0.5.bed -sorted > 6HIPP_commonpeak.bed
+  # 13483 6HIPP_commonpeak.bed 共有peak约占HIPP的一半
+  # 21531 HIPP_pool_merge.bed
+bedtools intersect -wa -u -a PFC_pool_merge.bed -b 5_123_0.5.bed -sorted > 7PFC_commonpeak.bed
+  # 13483 7PFC_commonpeak.bed
+  # 58240 PFC_pool_merge.bed
+bedtools intersect -wa -u -a cortex_pool_merge.bed -b 5_123_0.5.bed -sorted > 8cortex_commonpeak.bed
+  # 13483 8cortex_commonpeak.bed
+  # 45265 cortex_pool_merge.bed
+```
+① 重叠80% 
+```bash
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 # 9. 使用diffbind做主成分分析
 
