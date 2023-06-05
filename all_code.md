@@ -2464,14 +2464,87 @@ summary(cortex_common_length0.5$V1)
 ```
 
 
-① 重叠80% 
+① 重叠60% ——— 90%
 ```bash
+cd /mnt/xuruizhi/brain/common_peak_final/
+# 0.5先不加入循环
+cat > name.list <<EOF
+0.6
+0.7
+0.8
+0.9
+EOF
+
+cat name.list | while read id
+do
+  echo $id
+  mkdir -p /mnt/xuruizhi/brain/common_peak_final/$id/mouse
+  cp ./0.5/mouse/*_pool_merge.bed ./$id/mouse/
+  bedtools intersect -a ./$id/mouse/HIPP_pool_merge.bed -b ./$id/mouse/PFC_pool_merge.bed -sorted -f $id -r > ./$id/mouse/1HIPP_PFC_$id.bed  
+  bedtools intersect -a ./$id/mouse/HIPP_pool_merge.bed -b ./$id/mouse/cortex_pool_merge.bed -sorted -f $id -r > ./$id/mouse/2HIPP_cortex_$id.bed  
+  bedtools intersect -a ./$id/mouse/cortex_pool_merge.bed -b ./$id/mouse/PFC_pool_merge.bed -sorted -f $id -r > ./$id/mouse/3cortex_PFC_$id.bed 
+  wc -l ./$id/mouse/*
+done
+# 0.6
+#   16759 ./0.6/mouse/1HIPP_PFC_0.6.bed
+#   13712 ./0.6/mouse/2HIPP_cortex_0.6.bed
+#   33081 ./0.6/mouse/3cortex_PFC_0.6.bed
+#   21531 ./0.6/mouse/HIPP_pool_merge.bed
+#   58240 ./0.6/mouse/PFC_pool_merge.bed
+#   45265 ./0.6/mouse/cortex_pool_merge.bed
+#  188588 total
+# 0.7
+#   14399 ./0.7/mouse/1HIPP_PFC_0.7.bed
+#   11512 ./0.7/mouse/2HIPP_cortex_0.7.bed
+#   28398 ./0.7/mouse/3cortex_PFC_0.7.bed
+#   21531 ./0.7/mouse/HIPP_pool_merge.bed
+#   58240 ./0.7/mouse/PFC_pool_merge.bed
+#   45265 ./0.7/mouse/cortex_pool_merge.bed
+#  179345 total
+# 0.8
+#   10507 ./0.8/mouse/1HIPP_PFC_0.8.bed
+#    8130 ./0.8/mouse/2HIPP_cortex_0.8.bed
+#   20457 ./0.8/mouse/3cortex_PFC_0.8.bed
+#   21531 ./0.8/mouse/HIPP_pool_merge.bed
+#   58240 ./0.8/mouse/PFC_pool_merge.bed
+#   45265 ./0.8/mouse/cortex_pool_merge.bed
+#  164130 total
+# 0.9
+#    4768 ./0.9/mouse/1HIPP_PFC_0.9.bed
+#    3397 ./0.9/mouse/2HIPP_cortex_0.9.bed
+#    8973 ./0.9/mouse/3cortex_PFC_0.9.bed
+#   21531 ./0.9/mouse/HIPP_pool_merge.bed
+#   58240 ./0.9/mouse/PFC_pool_merge.bed
+#   45265 ./0.9/mouse/cortex_pool_merge.bed
+#  142174 total
+
+
+cd /mnt/xuruizhi/brain/common_peak_final/
+cat name.list | while read id
+do
+  echo $id
+  bedtools intersect -a ./$id/mouse/1HIPP_PFC_$id.bed -b ./$id/mouse/2HIPP_cortex_$id.bed > ./$id/mouse/4_12_$id.bed 
+  bedtools intersect -a ./$id/mouse/3cortex_PFC_$id.bed -b ./$id/mouse/4_12_$id.bed > ./$id/mouse/5_123_$id.bed 
+
+## 使用bedtools intersect命令对HIPP_pool_merge.bed文件与5_123_0.5.bed文件进行交集计算，输出包含交集区域中的HIPP所有行，并且去除重复的行。输入文件已经按照染色体名称和位置进行了排序。
+  bedtools intersect -wa -u -a ./$id/mouse/HIPP_pool_merge.bed -b ./$id/mouse/5_123_$id.bed -sorted > ./$id/mouse/6HIPP_commonpeak.bed
+  bedtools intersect -wa -u -a ./$id/mouse/PFC_pool_merge.bed -b ./$id/mouse/5_123_$id.bed -sorted > ./$id/mouse/7PFC_commonpeak.bed
+  bedtools intersect -wa -u -a ./$id/mouse/cortex_pool_merge.bed -b ./$id/mouse/5_123_$id.bed -sorted > ./$id/mouse/8cortex_commonpeak.bed
+  wc -l ./$id/mouse/5_123_$id.bed 
+  # mkdir -p /mnt/d/brain/brain/common_peak_final/$id/mouse
+  # cp ./$id/mouse/* /mnt/d/brain/brain/common_peak_final/$id/mouse
+done
+
+# 11564 ./0.6/mouse/5_123_0.6.bed
+# 8513 ./0.7/mouse/5_123_0.7.bed
+# 4584 ./0.8/mouse/5_123_0.8.bed
+# 985 ./0.9/mouse/5_123_0.9.bed
 ```
 
 
 
 # 11. 统计脑区独有peak
-
+① 统计
 * -c 参数会把a与b,c的重叠部分都报道出来，可以帮助统计a独有peak。 
 * HIPP 
 ```bash
@@ -2515,11 +2588,150 @@ bedtools intersect -wa -c -r -a PFC_pool_merge.bed -b  HIPP_pool_merge.bed corte
 # 18367 PFC_diff0.5.bed
 bedtools intersect -a PFC_pool_merge.bed -b cortex_pool_merge.bed HIPP_pool_merge.bed -sorted -v > PFC_totaldiff0.5.bed
 # 16535 14PFC_totaldiff0.5.bed
+mkdir -p /mnt/d/brain/brain/diff_peak/
+cp -r /mnt/xuruizhi/brain/diff_peak/*  /mnt/d/brain/brain/diff_peak/
+```
+
+② 富集分析
+```bash
+cd /mnt/xuruizhi/brain/diff_peak/0.5/mouse
+ls *_totaldiff0.5.bed | while read id
+do
+  echo $id 
+  awk '{print ($3- $2)}' $id > "${id%%0.5*}_length.txt"
+done
+```
+```r
+ getwd()
+# [1] "D:/brain/brain/R_analyse"
+ HIPP_totaldiff_length0.5 <- read.table("D:/brain/brain/diff_peak/0.5/mouse/HIPP_totaldiff_length.txt")
+ summary(HIPP_totaldiff_length0.5$V1)
+ hist(abs(as.numeric(HIPP_totaldiff_length0.5[,1])),breaks=500,xlab = "Fragment length(bp)",ylab = "Frequency",main = "HIPP_totaldiffpeak length")
+
+# 其他已经在#12.peak annotation作为示例
+# 其他组织同上
+file_names <- c("PFC_totaldiff_length.txt", "cortex_totaldiff_length.txt")
+for (file_name in file_names) {
+  # 构建完整文件路径
+  file_path <- paste0("D:/brain/brain/diff_peak/0.5/mouse/", file_name)
+  # 读取文件并将其写入对应的对象
+  assign(gsub("\\.txt", "", file_name), read.table(file_path))
+}
+file_names <- c("PFC_totaldiff0.5.bed", "cortex_totaldiff0.5.bed")
+for (file_name in file_names) {
+  # 构建完整文件路径
+  file_path <- paste0("D:/brain/brain/diff_peak/0.5/mouse/", file_name)
+  # 读取文件并将其写入对应的对象
+  assign(gsub("\\.bed", "", file_name), readPeakFile(file_path))
+}
+```
+
+> covplot(cortex_totaldiff)
+
+# peak 在TSS位点附件的分布
+ txdb <- TxDb.Mmusculus.UCSC.mm10.knownGene
+  promoter <- getPromoters(TxDb=txdb, upstream=1000, downstream=1000)
+  tagMatrix <- getTagMatrix(cortex_totaldiff0.5, windows=promoter)
+ tagHeatmap(tagMatrix, xlim=c(-1000, 1000), color="red")
+ plotAvgProf(
+  tagMatrix,
+  xlim=c(-1000, 1000),
+  xlab="Genomic Region (5'->3')",
+  ylab = "Peak Frequency")
+```
+
+② peak关联基因注释  
+给出了关联的基因以及对应的基因组区域的类别，根据这个结果，可以提取关联基因进行下游的功能富集分析，比如提取geneid这一列，用clusterProfiler进行GO/KEGG等功能富集分析。  
+
+```r
+> cortex_totaldiff_Annolist <- annotatePeak(
+    cortex_totaldiff0.5,
+    tssRegion = c(-1000, 1000),
+    TxDb = txdb,
+    annoDb = "org.Mm.eg.db")
+# Annotated peaks generated by ChIPseeker
+# 1475/1475  peaks were annotated
+# Genomic Annotation Summary:
+#              Feature  Frequency
+# 9           Promoter 21.7627119
+# 4             5' UTR  0.4745763
+# 3             3' UTR  3.1864407
+# 1           1st Exon  1.6949153
+# 7         Other Exon  4.2033898
+# 2         1st Intron 10.4406780
+# 8       Other Intron 24.2033898
+# 6 Downstream (<=300)  0.1355932
+# 5  Distal Intergenic 33.8983051
+
+
+> write.table(
+    as.data.frame(cortex_totaldiff_Annolist),
+    "cortex_totaldiff.annotation.tsv",
+    sep="\t",
+    row.names = F,
+    quote = F)   
+
+#可视化
+> plotAnnoPie(cortex_totaldiff_Annolist)
+> plotAnnoBar(HIPP_totaldiff_Annolist) 
+> plotDistToTSS(HIPP_totaldiff_Annolist,title="Distribution of accessible regions relative to TSS")
+```  
+
+③ 基因ID转化  
+
+```r
+# 提取差异基因
+> cortex_totaldiffpeakAnno <- as.data.frame(cortex_totaldiff_Annolist)
+
+# 转换函数
+> ensembl_id_transform <- function(ENSEMBL_ID){
+    # geneID是输入的基因ID，fromType是输入的ID类型，toType是输出的ID类型，OrgDb注释的db文件，drop表示是否剔除NA数据
+    a = bitr(ENSEMBL_ID, fromType="ENSEMBL", toType=c("SYMBOL","ENTREZID"), OrgDb="org.Mm.eg.db")
+    return(a)
+}
+> cortex_ensembl_id_transform <- ensembl_id_transform(cortex_totaldiffpeakAnno$ENSEMBL)
+# 0.08% of input gene IDs are fail to map...
+
+# 写入文件
+> write.csv(ensembl_id_transform(cortex_totaldiffpeakAnno$ENSEMBL), file="cortex_totaldiffpeak_geneID.tsv", quote = F)
+
+
+# 使用ClusterProfiler包进行转化有一部分部分没有映射到，换biomaRt包试一下
+BiocManager::install("biomaRt", force = TRUE)
+library(biomaRt)
+mart <- useDataset( "mmusculus_gene_ensembl", useMart("ENSEMBL_MART_ENSEMBL"))
+
+cortex_biomart_ensembl_id_transform <- getBM(attributes=c("ensembl_gene_id","external_gene_name","entrezgene_id", "description"),filters = 'ensembl_gene_id', values = cortex_totaldiffpeakAnno$ENSEMBL, mart = mart) # 转化了1294
+write.csv(cortex_biomart_ensembl_id_transform, file="cortex_biomart_diffgeneID.tsv", quote = F)
+# 不和上一个差不多
 ```
 
 
 
 
+④ 功能富集分析 
+选择biomark找到的基因进行分析   
+
+```r
+# Run GO enrichment analysis 
+cortexdiff_BP <- enrichGO(
+        gene = cortex_ensembl_id_transform$ENTREZID, 
+        keyType = "ENTREZID",
+        OrgDb = org.Mm.eg.db, 
+        ont = "BP", 
+        pAdjustMethod = "BH", 
+        qvalueCutoff = 0.05, 
+        readable = TRUE)
+# bar visualization
+barplot(cortexdiff_BP, showCategory=40, font.size = 6, title = paste("The GO BP enrichment analysis", sep = ""))
+
+# Multiple samples KEGG analysis
+cortexdiff_kegg <- enrichKEGG(gene =
+        cortex_ensembl_id_transform$ENTREZID,
+        organism = 'mmu',
+        pvalueCutoff = 0.05,
+        pAdjustMethod = "BH")
+barplot(cortexdiff_kegg, showCategory = 20, title = "KEGG Pathway Enrichment Analysis")
 
 
 
@@ -2538,7 +2750,10 @@ bedtools intersect -a PFC_pool_merge.bed -b cortex_pool_merge.bed HIPP_pool_merg
 
 
 
-# 9. 使用diffbind做主成分分析
+
+
+
+# 11. 使用diffbind做主成分分析
 
 
 ① read in a set of peaksets and associated metadata  
@@ -2699,22 +2914,12 @@ The next step is to calculate a binding matrix with scores based on read counts 
 # HIPP3   17589852 0.15   2638478
 ```
 
-# 10. peak annotation
+# 12. peak annotation，可以不看，只是举例
 
 1. 目的： 
 
  获得 Peak 后，Peak 的注释可将染色质的可及性与基因调控联系起来。通常，Peak 由最接近的基因或调控元件进行注释。通常，来自 ATAC-seq 的 Peak 将代表不同的顺式调节元件的混合物，包括增强子和启动子 。在获得基因组特征列表之后，还可以使用 GO,KEGG和 Reactome等数据库进行功能富集分析。通常，Peak 注释会产生生物学和功能上有意义的结果，以供进一步研究。
 
-2. 使用软件:   
-
- `ChIPseeker`和 `ChIPpeakAnno`被广泛用于为最接近或重叠的基因、外显子、内含子、启动子、5'UTR、3'UTR 和其他基因组特征分配 Peak。ChIPseeker 和 ChIPpeakAnno 还具有丰富的可视化功能，可用于解释注释结果，例如带有注释的基因组特征的饼图。  
-
-3. 输入文件：  
-
-一个就是要注释的peaks的文件，需满足BED格式。另一个就是注释参考文件，即需要一个包含注释信息的TxDb对象。  
-
-
-4. 步骤： 
 
 ① 导入文件做基础分析  
 
