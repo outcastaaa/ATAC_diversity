@@ -1428,7 +1428,7 @@ idr --samples ./SRR11179780_peaks.narrowPeak.8thsorted ./SRR11179781_peaks.narro
 # SRR130..59-61
 # SRR143..76-81-82
 ```
-* !注意：务必在(py3.8)的conda环境中使用idr，否则报错  
+## !注意：务必在(py3.8)的conda环境中使用idr，否则报错  
 
 * 最终完整代码：   
 ① HIPP
@@ -2081,9 +2081,10 @@ Bottom Row: Peaks rank versus idr scores are plotted in black. The overlayed box
 | peak数                          | 21531                                                         | 45265                      | 58240                                                                           | 58525         |
 
 # 10. 不同组织可重复peak
-## 10.1 A，B，C重叠部分
+
 1. 原理：比较两个文件的peak，有三种情况：长度相差不大，可以直接根据重叠比例确定；query文件比B文件peak长，重叠A的50%也可以；当query文件的peak比较短时，该情况可能存在A peak可能只占B的20%，但却是A的100%的情况，这样就不可算作一个peak。要加上参数-r。  
 
+## 10.1 A，B，C重叠部分，并集再取并集
 2. 代码：
 ```bash
 # 每个组织的common peak
@@ -2121,9 +2122,12 @@ cat all.bed | awk '{print $1, $2, $3, ($3- $2), $6, $7, ($7-$6) > "peak_length.t
 # chr1 3670267 3672643 2376 3670275 3672668 2393
 # chr1 4089410 4090009 599 4089488 4090051 563
 # 该方法使得peak太长了
+```
+## 10.2 A，B，C重叠部分，交集再取并集 + 区域特异性peak
 
-
-# 方法3：只取a&b，a&c，b&c相交长度占总长的50%以上的部分，再merge，更合理一些
+① 重叠50%  
+```bash
+# 方法3：只取a&b，a&c，b&c相交长度占总长的50%以上的部分，再merge，更合理一些，但此方法会取只有2/3组织中存在的peak
 # 本质上还是这三个peak，只不过peak长度大大缩短，只保留了重叠部分再merge
 ## a&(b+c)
 bedtools intersect -a HIPP_pool_merge.bed -b PFC_pool_merge.bed cortex_pool_merge.bed -sorted -f 0.5 > 1HIPP_PFCcortex_0.5.bed
@@ -2299,12 +2303,12 @@ tsv-filter  --is-numeric 4 --eq 4:0 12PFC_0.9.bed > 13PFC_diff0.9.bed
 bedtools intersect -a PFC_pool_merge.bed -b cortex_pool_merge.bed HIPP_pool_merge.bed -sorted -v > 14PFC_totaldiff0.8.bed
 # 16535 14PFC_totaldiff0.8.bed
 ```
-## 10.2 以A文件为主
+## 10.3 以A文件为主
 ```bash
 # 以HIPP为主
 bedtools intersect -wa -u -a HIPP_pool_merge.bed -b PFC_pool_merge.bed cortex_pool_merge.bed -sorted 
 ```
-## 10.3 A,B,C重叠并取原来的peak ————以此为准
+## 10.4 A,B,C重叠并取原来的peak，交集再交集 ————以此为准
 
 只取a&b，a&c，b&c相交长度占总长的50%以上的部分，再取交集，看此交集对应的peak原位置  
 
@@ -2544,7 +2548,7 @@ done
 
 
 # 11. 统计脑区独有peak
-① 统计
+## 1. 统计
 * -c 参数会把a与b,c的重叠部分都报道出来，可以帮助统计a独有peak。 
 * HIPP 
 ```bash
@@ -2592,7 +2596,7 @@ mkdir -p /mnt/d/brain/brain/diff_peak/
 cp -r /mnt/xuruizhi/brain/diff_peak/*  /mnt/d/brain/brain/diff_peak/
 ```
 
-② 富集分析
+## 2. 富集分析
 ```bash
 cd /mnt/xuruizhi/brain/diff_peak/0.5/mouse
 ls *_totaldiff0.5.bed | while read id
@@ -2601,6 +2605,7 @@ do
   awk '{print ($3- $2)}' $id > "${id%%0.5*}_length.txt"
 done
 ```
+① 导入数据  
 ```r
  getwd()
 # [1] "D:/brain/brain/R_analyse"
@@ -2625,7 +2630,7 @@ for (file_name in file_names) {
   assign(gsub("\\.bed", "", file_name), readPeakFile(file_path))
 }
 ```
-
+```r
 > covplot(cortex_totaldiff)
 
 # peak 在TSS位点附件的分布
@@ -2642,7 +2647,6 @@ for (file_name in file_names) {
 
 ② peak关联基因注释  
 给出了关联的基因以及对应的基因组区域的类别，根据这个结果，可以提取关联基因进行下游的功能富集分析，比如提取geneid这一列，用clusterProfiler进行GO/KEGG等功能富集分析。  
-
 ```r
 > cortex_totaldiff_Annolist <- annotatePeak(
     cortex_totaldiff0.5,
@@ -2732,7 +2736,7 @@ cortexdiff_kegg <- enrichKEGG(gene =
         pvalueCutoff = 0.05,
         pAdjustMethod = "BH")
 barplot(cortexdiff_kegg, showCategory = 20, title = "KEGG Pathway Enrichment Analysis")
-
+```
 
 
 
