@@ -1611,6 +1611,20 @@ print "$_\t$result\n";
 ④ 统计平均长度与长度分布情况
 ```bash
 cd /mnt/xuruizhi/brain/IDR_final/mouse
+# 统计下idr单独找到的两两consensus peak长度，看后续merge取并集的操作是否使得最后peak集太长：不会太长，idr处理合理
+for i in $(ls HIPP*_IDR0.05.txt);do
+> echo $i
+> cat $i | awk '{print $3-$2}' | awk '{sum += $1} END {print avg = sum/NR}'
+> done
+# HIPP79-80_IDR0.05.txt
+# 1096.27
+# HIPP79-81_IDR0.05.txt
+# 1068.56
+# HIPP80-81_IDR0.05.txt
+# 1084.26
+
+
+cd /mnt/xuruizhi/brain/IDR_final/mouse
 #  21531 HIPP_pool_merge.bed
 #  45265 cortex_pool_merge.bed
 #  58240 PFC_pool_merge.bed
@@ -1639,7 +1653,7 @@ perl /mnt/d/scripts/average.pl
 # 1110.22084436394
 # 898.887843406593
 # 785.587076107368
-# 最终平均值: 931.565254625967
+# 最终平均值: 931.565254625967 不会太长，idr处理合适
 
 cp /mnt/xuruizhi/brain/IDR_final/mouse/* /mnt/d/brain/brain/IDR_final/mouse/
 ```
