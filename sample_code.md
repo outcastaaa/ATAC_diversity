@@ -248,7 +248,10 @@ chomp;
 print "$_" . ".sra\n";
 '
 cd ~/xuruizhi/brain/brain/sequence
-bsub -q mpi -n 24 -J sra2fq_mouse -o ~/xuruizhi/brain/brain/fastq/mouse " cat MOUSE.list |  parallel --no-run-if-empty --linebuffer -k -j 10 '/share/home/wangq/bin/fastq-dump.3.0.0 --gzip --split-3 -O ~/xuruizhi/brain/brain/fastq/mouse ~/xuruizhi/brain/brain/sequence/{}'"
+bsub -q mpi -n 24 -J sra2fq_mouse -o ~/xuruizhi/brain/brain/fastq/mouse " \
+cat MOUSE.list |  parallel --no-run-if-empty --linebuffer -k -j 10 \
+'/share/home/wangq/bin/fastq-dump.3.0.0 --gzip --split-3 \
+-O ~/xuruizhi/brain/brain/fastq/mouse ~/xuruizhi/brain/brain/sequence/{}'"
 
 
 
