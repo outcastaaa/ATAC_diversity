@@ -493,7 +493,7 @@ cat pair.list  | while read id; do sed "s/{}/${id}/g" 111.sh > ${id}.sh; done
 # Job <8601516> is submitted to queue <mpi>.
 
 
-# 写双端批量
+# 写单端批量
 cat 222.sh
 #!/usr/bin bash
 bowtie2  -p 48 -x  ~/xuruizhi/brain/brain/genome/mouse/mm10 \
@@ -1002,7 +1002,7 @@ do echo $id
   sample=${arr[0]}
 
   cat ${sample}.final.bam.bed | awk -v \
-  OFS="\t" '{if($6=="+"){print $1,$2+4,$3+4} \
+  OFS="\t" '{if($6=="+"){print $1,$2+4,$3+4}} \
    else if($6=="-"){print $1,$2-5,$3-5}}' \
     > /mnt/xuruizhi/brain/Tn5_shift/mouse/${sample}.Tn5.bed
 done
@@ -3179,3 +3179,19 @@ Low-quality bases (Phred <20) and Nextera adapters (5’-CTGTCTCTTATA-3’) were
 
 使用 Genomic Regions Enrichment ofAnnotations Tool (GREAT) 4.0.4 版（McLean 等人，2010）进行基因本体论分析。 差异 OCR 峰集的基因组坐标用作前景区域。 对于背景区域，我们使用了从每个物种的所有处理过的组织中识别出的所有可重现的开放染色质峰的联合。 显着过度代表的本体类别按超几何错误发现率 q 值排序，并且仅考虑由至少 5 个基因组成的 GO 术语。
 为了鉴定相对于打乱序列的感兴趣的差异OCR峰集中富集的转录因子结合基序，我们在MEME套件中使用了AME，对总优势分数进行费舍尔的精确测试（该序列的位置权重矩阵（PWM）基序得分总分），所有参数为默认。对于我们的PWM集，我们使用了JASPAR2018 CORE非冗余脊椎动物集motif。
+
+# 可做额外项目
+1. peak间的overlap分析
+
+peak的overlap分析不仅可以探究生物学重复样本间的一致性，还可以进一步识别多种蛋白或者转录因子在调控网络中的作用，如果两个蛋白的chip结果overlap显著，很可能这两个蛋白构成了复合体，或者两种蛋白具有相互作用，这对于探究其调控机制有相当大的帮助。用法如下:
+```r
+enrichPeakOverlap(
+    queryPeak     = peak_setA,
+    targetPeak    = c(peak_setB, peak_setC),
+    TxDb          = txdb,
+    pAdjustMethod = "BH",
+    nShuffle      = 1000,
+    chainFile     = NULL,
+    verbose       = FALSE)
+# enrichPeakOverlap 用于进行富集分析和计算两个峰集合之间的重叠情况，而不是用于找到共同的峰。
+```
