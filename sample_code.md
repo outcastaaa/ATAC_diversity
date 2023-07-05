@@ -1,3 +1,4 @@
+- [0. 安装软件](#0-安装软件)
 - [1. 建目录](#1-建目录)
 - [2. 下载数据](#2-下载数据)
 - [3. 比对前质控](#3-比对前质控)
@@ -10,6 +11,47 @@
 - [10. 不同组织可重复peak](#10-不同组织可重复peak)  
 - [9. diffbind](#9-使用diffbind做主成分分析)
 
+# 0. 安装软件
+```bash
+cd /mnt/d/biosoft
+wget https://github.com/wang-q/anchr/releases/download/v0.3.18/anchr-x86_64-unknown-linux-musl.tar.gz
+tar xvzf anchr-x86_64-unknown-linux-musl.tar.gz
+chmod +x /mnt/d/biosoft/target/x86_64-unknown-linux-musl/release/anchr
+
+vim ~/.bashrc
+# <<< anchr >>>
+export PATH="/mnt/d/biosoft/target/x86_64-unknown-linux-musl/release/anchr:$PATH"
+source ~/.bashrc
+# 好像还是没办法直接用，指定路径使用 /mnt/d/biosoft/target/x86_64-unknown-linux-musl/release/anchr
+/mnt/d/biosoft/target/x86_64-unknown-linux-musl/release/anchr -h
+anchr 0.3.18
+# wang-q <wang-q@outlook.com>
+# Anchr - the Assembler of N-free CHRomosomes
+
+# 安装依赖项
+cpan Getopt::Long::Descriptive
+cpan LWP::Simple
+
+# 下载示例
+mkdir -p ~/data/anchr/g37/ena
+cd ~/data/anchr/g37/ena
+
+cat << EOF > source.csv
+ERX452667,G37,MiSeq
+EOF
+    # * first column is one SRA object ID, /(?:[DES]R\w|SAMN|PRJNA)\d+/, SRP or SRX
+    # * second column is the name of one group
+    # * other columns are optional
+
+/mnt/d/biosoft/target/x86_64-unknown-linux-musl/release/anchr ena info | perl - -v source.csv > ena_info.yml
+/mnt/d/biosoft/target/x86_64-unknown-linux-musl/release/anchr ena prep | perl - ena_info.yml
+
+mlr --icsv --omd cat ena_info.csv
+
+aria2c -j 4 -x 4 -s 2 -c --file-allocation=none -i ena_info.ftp.txt
+
+md5sum --check ena_info.md5.txt
+```
 
 # 1. 建目录
 ```bash
