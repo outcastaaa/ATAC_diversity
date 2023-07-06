@@ -32,26 +32,26 @@ mkdir -p /mnt/xuruizhi/ATAC_brain/mouse
 # mouse 23个，后三个是单端测序SRR13443549,SRR13443553,SRR13443554
 cd /mnt/xuruizhi/ATAC_brain/mouse
 cat >MOUSE.list <<EOF
-SRR11179779.    0e6ac756b030cc84f42de5bce499f5fd
-SRR11179780.    d1766b149fe0182ae872bf79a3decd5a
-SRR11179781.    b93250c0ce5affeb603fa071c78fcce0
-SRR13049359.    3f280eaf565605981db8d3062bf6a6a3
-SRR13049360.    70677096eb974366da7152f36fa0c5b0
-SRR13049361.    119bfddf4301e49835661bf24693199c
-SRR13049362.    674996a273c74bbb3d52cfc025e155da
-SRR13049363.    a54bb8dad247d4e7c114f12fd1b8791a
-SRR13049364.    bf1dc5b5a62011235fdf854f860c98b8
-SRR14362271.    8667509648f566de1e8b3b3e3638b3e0
-SRR14362272.    bb509a5db71ff478426c773aa2c9770d
-SRR14362275.    5eb17b41b9ac7c2caa4967752c416c98
-SRR14362276.    075c3926a6a49c15ce85ac9194cc5370
-SRR14362281.    c2cee7a6f408c5db7c8a81119e2ee43b
-SRR14362282.    33a21b0f50030658b5a2d48f6573c1c3
+SRR11179779    0e6ac756b030cc84f42de5bce499f5fd
+SRR11179780    d1766b149fe0182ae872bf79a3decd5a
+SRR11179781    b93250c0ce5affeb603fa071c78fcce0
+SRR13049359    3f280eaf565605981db8d3062bf6a6a3
+SRR13049360    70677096eb974366da7152f36fa0c5b0
+SRR13049361    119bfddf4301e49835661bf24693199c
+SRR13049362    674996a273c74bbb3d52cfc025e155da
+SRR13049363    a54bb8dad247d4e7c114f12fd1b8791a
+SRR13049364    bf1dc5b5a62011235fdf854f860c98b8
+SRR14362271    8667509648f566de1e8b3b3e3638b3e0
+SRR14362272    bb509a5db71ff478426c773aa2c9770d
+SRR14362275    5eb17b41b9ac7c2caa4967752c416c98
+SRR14362276    075c3926a6a49c15ce85ac9194cc5370
+SRR14362281    c2cee7a6f408c5db7c8a81119e2ee43b
+SRR14362282    33a21b0f50030658b5a2d48f6573c1c3
 SRR14614715×
-SRR3595211.    fd2862221c839f1da0bf667704eb63c1
-SRR3595212.    21076454a9730edede42d98f09aa10bc
-SRR3595213.    c277a3891a38d31a0beb94105937e45d
-SRR3595214.    b2ca2eee6d312f08831d9e27657dda37
+SRR3595211    fd2862221c839f1da0bf667704eb63c1
+SRR3595212    21076454a9730edede42d98f09aa10bc
+SRR3595213    c277a3891a38d31a0beb94105937e45d
+SRR3595214    b2ca2eee6d312f08831d9e27657dda37
 SRR13443549.   0e3302401f4581bddc071b41c11f939a
 SRR13443553.   861aa5a62152623cb54d34fd12ede271
 SRR13443554.   5db94c5616aaeba4e3970b8f487fd4c1
@@ -220,8 +220,8 @@ trim_galore --phred33 --length 35 -e 0.1 --stringency 3 --paired \
 -o /mnt/xuruizhi/ATAC_brain/mouse/trim  {}_1.fastq.gz  {}_2.fastq.gz
 
 # fatsqc_again
-fastqc -t 6 -o /mnt/xuruizhi/ATAC_brain/mouse/fastqc_again /mnt/xuruizhi/ATAC_brain/mouse/trim/{}_1.fastq.gz
-fastqc -t 6 -o /mnt/xuruizhi/ATAC_brain/mouse/fastqc_again /mnt/xuruizhi/ATAC_brain/mouse/trim/{}_2.fastq.gz
+fastqc -t 6 -o /mnt/xuruizhi/ATAC_brain/mouse/fastqc_again /mnt/xuruizhi/ATAC_brain/mouse/trim/{}_1_val_1.fq.gz
+fastqc -t 6 -o /mnt/xuruizhi/ATAC_brain/mouse/fastqc_again /mnt/xuruizhi/ATAC_brain/mouse/trim/{}_2_val_2.fq.gz
 EOF
 
 cat pair.list | while read id
@@ -255,7 +255,7 @@ cat >mouse_single.sh <<EOF
 trim_galore --phred33 --length 35 -e 0.1 --stringency 3 -o /mnt/xuruizhi/ATAC_brain/mouse/trim {}.fastq.gz
 
 # fatsqc_again
-fastqc -t 6 -o /mnt/xuruizhi/ATAC_brain/mouse/fastqc_again /mnt/xuruizhi/ATAC_brain/mouse/trim/{}.fastq.gz
+# fastqc -t 6 -o /mnt/xuruizhi/ATAC_brain/mouse/fastqc_again /mnt/xuruizhi/ATAC_brain/mouse/trim/{}_trimmed.fq.gz
 EOF
 
 cat single.list | while read id
@@ -266,6 +266,14 @@ done
 
 cd  /mnt/xuruizhi/ATAC_brain/mouse/fastqc_again
 multiqc .
+
+# 因为CG含量质控不合格，删除了
+SRR11179779_1_val_1
+SRR11179779_2_val_2
+SRR13049360_1_val_1
+SRR13049360_2_val_2
+SRR13049361_1_val_1
+SRR13049361_2_val_2
 ```
 ```bash
 # 传到超算
@@ -289,6 +297,30 @@ cp /mnt/d/atac/genome/* /mnt/xuruizhi/ATAC_brain/mouse/genome/
 # 进入超算
 mkdir -p /scratch/wangq/xrz/ATAC_brain/mouse/genome
 cp /share/home/wangq/xuruizhi/brain/brain/genome/mouse/* /scratch/wangq/xrz/ATAC_brain/mouse/genome/
+
+cd /scratch/wangq/xrz/ATAC_brain/mouse/trim
+vim pair.list
+SRR11179780
+SRR11179781
+SRR13049359
+SRR13049362
+SRR13049363
+SRR13049364
+SRR14362271
+SRR14362272
+SRR14362275
+SRR14362276
+SRR14362281
+SRR14362282
+SRR3595211
+SRR3595212
+SRR3595213
+SRR3595214
+
+vim single.list
+SRR13443549
+SRR13443553
+SRR13443554
 ```
 
 2. 比对
@@ -296,10 +328,6 @@ cp /share/home/wangq/xuruizhi/brain/brain/genome/mouse/* /scratch/wangq/xrz/ATAC
 mkdir -p /scratch/wangq/xrz/ATAC_brain/mouse/align/
 # 循环 
 cd /scratch/wangq/xrz/ATAC_brain/mouse/trim
-rsync -av /mnt/xuruizhi/ATAC_brain/mouse/sequence/pair.list \
-wangq@202.119.37.251:/scratch/wangq/xrz/ATAC_brain/mouse/trim/
-rsync -av /mnt/xuruizhi/ATAC_brain/mouse/sequence/single.list \
-wangq@202.119.37.251:/scratch/wangq/xrz/ATAC_brain/mouse/trim/
 
 # 双端
 bowtie2  -p 48 -x /scratch/wangq/xrz/ATAC_brain/mouse/genome/mm10 \
@@ -329,24 +357,148 @@ cd /scratch/wangq/xrz/ATAC_brain/mouse/trim
 # 双端 
 cat pair.list  | while read id
 do 
-  sed "s/{}/${id}/g" mouse_pair.sh > ${id}_pair_align.sh;
-  bsub -q mpi -n 48 -o ../align "
+  sed "s/{}/${id}/g" mouse_pair.sh > ${id}_pair_align.sh
+  bsub -q mpi -n 96 -o ../align "
   bash  ${id}_pair_align.sh >> ../align/align.log 2>&1"
 done
 # 单端
 cat single.list  | while read id
 do 
   sed "s/{}/${id}/g" mouse_single.sh > ${id}_single_align.sh;
-  bsub -q mpi -n 48 -o ../align "
-  bash ${id}_single_align.sh >> ../align/align.log 2>&1"
+  bsub -q largemem -n 96 -o ../align "
+  bash ${id}_single_align.sh >> ../align/align_single.log 2>&1"
 done
 ```
 
 4. 传到本地
-
-
-
-## 大批量转化
 ```bash
+rsync -av wangq@202.119.37.251:/scratch/wangq/xrz/ATAC_brain/mouse/align \
+/mnt/xuruizhi/ATAC_brain/mouse/
+rsync -av wangq@202.119.37.251:/scratch/wangq/xrz/ATAC_brain/mouse/sort_bam \
+/mnt/xuruizhi/ATAC_brain/mouse/
+```
 
+# 5. post-alignment
+```bash
+cd /scratch/wangq/xrz/ATAC_brain/mouse/sort_bam
+
+cat >MOUSE.list <<EOF
+SRR11179780
+SRR11179781
+SRR13049359
+SRR13049362
+SRR13049363
+SRR13049364
+SRR14362271
+SRR14362272
+SRR14362275
+SRR14362276
+SRR14362281
+SRR14362282
+SRR3595211
+SRR3595212
+SRR3595213
+SRR3595214
+SRR13443549
+SRR13443553
+SRR13443554
+EOF
+```
+1. remove PCR-duplicate reads
+```bash
+mkdir -p /scratch/wangq/xrz/ATAC_brain/mouse/rmdup
+cd /scratch/wangq/xrz/ATAC_brain/mouse/sort_bam
+
+vim mouse_common.sh
+#!/usr/bin bash
+
+# rmdup
+parallel -k -j 96 'picard MarkDuplicates -I ./{}.sort.bam \
+-O ../rmdup/{}.rmdup.bam \
+-REMOVE_DUPLICATES true -VALIDATION_STRINGENCY LENIENT \
+-METRICS_FILE ../rmdup/{}.log'
+
+# index
+samtools index -@ 96 ../rmdup/{}.rmdup.bam
+samtools flagstat -@ 96 ../rmdup/{}.rmdup.bam > ../rmdup/${sample}.rmdup.stat
+```
+
+
+2. remove bad quality reads and chrM reads
+```bash
+mkdir -p /scratch/wangq/xrz/ATAC_brain/mouse/filter
+cd /scratch/wangq/xrz/ATAC_brain/mouse/sort_bam
+
+vim mouse_common.sh
+#!/usr/bin bash
+
+samtools view -h -f 2 -q 30 ../rmdup/{}.rmdup.bam | grep -v  chrM | samtools sort -@ 96 -O bam  -o ../filter/{}.filter.bam
+samtools index -@ 96 ../filter/{}.filter.bam
+samtools flagstat -@ 96 ../filter/{}.filter.bam > ../filter/{}.filter.stat
+```
+
+
+3. 大批量处理
+```bash
+cd /scratch/wangq/xrz/ATAC_brain/mouse/sort_bam
+cat MOUSE.list | while read id
+do
+  sed "s/{}/${id}/g" mouse_common.sh > ${id}_common.sh
+  bsub -q mpi -n 96 -o ../filter "
+  bash ${id}_common.sh >> ../filter/filter.log 2>&1"
+done
+```
+
+
+4. Blacklist filtering
+
+```
+
+cat name_new.list  | while read id; do sed "s/{}/${id}/g" filter.sh > ${id}_filter.sh; done
+
+cat name_new.list | while read id
+do
+  bsub -q mpi -n 48 -o ~/xuruizhi/brain/brain/filter_new/mouse "bash ${id}_filter.sh"
+done
+# Job <8604250-263> is submitted to queue <mpi>.
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+批量提交
+```bash
+rmdup_dir=/scratch/wangq/xrz/ATAC_brain/mouse/rmdup
+cd /scratch/wangq/xrz/ATAC_brain/mouse/sort_bam
+
+cat name.list  | while read id; do sed "s/{}/${id}/g" rmdup.sh > ${id}_rmdup.sh; done
+cat name.list | while read id
+do
+  bsub -q largemem -n 48 -J rmdup -o $rmdup_dir "bash ${id}.sh"
+done
 ```

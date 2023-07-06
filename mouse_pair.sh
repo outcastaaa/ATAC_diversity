@@ -13,18 +13,16 @@
 # -o /mnt/xuruizhi/ATAC_brain/mouse/trim  {}_1.fastq.gz  {}_2.fastq.gz
 
 # # fatsqc_again
-# fastqc -t 6 -o /mnt/xuruizhi/ATAC_brain/mouse/fastqc_again /mnt/xuruizhi/ATAC_brain/mouse/trim/{}_1.fastq.gz
-# fastqc -t 6 -o /mnt/xuruizhi/ATAC_brain/mouse/fastqc_again /mnt/xuruizhi/ATAC_brain/mouse/trim/{}_2.fastq.gz
+# fastqc -t 6 -o /mnt/xuruizhi/ATAC_brain/mouse/fastqc_again /mnt/xuruizhi/ATAC_brain/mouse/trim/{}_1_val_1.fq.gz
+# fastqc -t 6 -o /mnt/xuruizhi/ATAC_brain/mouse/fastqc_again /mnt/xuruizhi/ATAC_brain/mouse/trim/{}_2_val_2.fq.gz
 
 # align
-bowtie2  -p 48 -x /scratch/wangq/xrz/ATAC_brain/mouse/genome/mm10 \
---very-sensitive -X 2000 -1 /scratch/wangq/xrz/ATAC_brain/mouse/trim/{}_1_trimmed.fq.gz \
--2 /scratch/wangq/xrz/ATAC_brain/mouse/trim/{}_2_trimmed.fq.gz \
--S /scratch/wangq/xrz/ATAC_brain/mouse/align/{}.sam
+bowtie2  -p 96 -x /scratch/wangq/xrz/ATAC_brain/mouse/genome/mm10 --very-sensitive -X 2000 -1 /scratch/wangq/xrz/ATAC_brain/mouse/trim/{}_1_val_1.fq.gz -2 /scratch/wangq/xrz/ATAC_brain/mouse/trim/{}_2_val_2.fq.gz -S /scratch/wangq/xrz/ATAC_brain/mouse/align/{}.sam
+
 
 # sort_transfertobam_index 
-samtools sort -@ 48 /scratch/wangq/xrz/ATAC_brain/mouse/align/{}.sam \
-> /scratch/wangq/xrz/ATAC_brain/mouse/sort_bam/{}.sort.bam
-samtools index -@ 48 /scratch/wangq/xrz/ATAC_brain/mouse/sort_bam/{}.sort.bam
-samtools flagstat  -@ 48 /scratch/wangq/xrz/ATAC_brain/mouse/sort_bam/{}.sort.bam \
-> /scratch/wangq/xrz/ATAC_brain/mouse/sort_bam/{}.raw.stat
+samtools sort -@ 96 /scratch/wangq/xrz/ATAC_brain/mouse/align/{}.sam > /scratch/wangq/xrz/ATAC_brain/mouse/sort_bam/{}.sort.bam
+samtools index -@ 96 /scratch/wangq/xrz/ATAC_brain/mouse/sort_bam/{}.sort.bam
+samtools flagstat  -@ 96 /scratch/wangq/xrz/ATAC_brain/mouse/sort_bam/{}.sort.bam > /scratch/wangq/xrz/ATAC_brain/mouse/sort_bam/{}.raw.stat
+
+
