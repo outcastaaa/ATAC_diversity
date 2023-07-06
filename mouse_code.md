@@ -114,13 +114,198 @@ rsync -av /mnt/xuruizhi/ATAC_brain/mouse/sequence \
 wangq@202.119.37.251:/scratch/wangq/xrz/ATAC_brain/mouse/
 # find /scratch/wangq/xrz/ATAC_brain/mouse/sra -type d -name "SRR*"\
 # -exec sh -c 'find {} -type f -name "*.sra" -exec cp -r {} ../ \;' \;此代码有错
-
-
+cd /mnt/xuruizhi/ATAC_brain/mouse/sequence
+md5sum *.fastq.gz
+# e7c21902b5f6228c04bfefc4c7605d3d  SRR11179779_1.fastq.gz
+# a17f0de8bb0baf6d9612e6cca491420c  SRR11179779_2.fastq.gz
+# 642e3990eca76e041138f0d1dc12f9a1  SRR11179780_1.fastq.gz
+# b3cbea2262204638e15b2fb4727f4337  SRR11179780_2.fastq.gz
+# b8721636cf9ec8ac56502f5a430fbf62  SRR11179781_1.fastq.gz
+# be248c9c98d6457ad4602d83efc85d29  SRR11179781_2.fastq.gz
+# 8146a8f87792beaafa66da54106523d8  SRR13049359_1.fastq.gz
+# 10bf9afbee98da9265ec19de38c8a2bc  SRR13049359_2.fastq.gz
+# 7caf7e99e7948298e6a63e826933537a  SRR13049360_1.fastq.gz
+# 30b5cfef2978503998369c9d44674720  SRR13049360_2.fastq.gz
+# 4149b45bd8e854d5b93a2a13e62b9529  SRR13049361_1.fastq.gz
+# deba00dd254e75092ca3ae2efeabaff6  SRR13049361_2.fastq.gz
+# 990cf81d4e9a11d1e8cfb5cf4795db4c  SRR13049362_1.fastq.gz
+# 0bba68428f864feb3d0052e6e8024c84  SRR13049362_2.fastq.gz
+# 0fefd64e285d298dbf7c9516bf5c15e2  SRR13049363_1.fastq.gz
+# b8fbd54a787d43b16b62a9db59c0a5c5  SRR13049363_2.fastq.gz
+# 6729a52e1ec94690ac3134e5d0db71f4  SRR13049364_1.fastq.gz
+# e878afe75d759c37bc3c9aeb08601d96  SRR13049364_2.fastq.gz
+# b2276393d4aff553f4062996c88db88b  SRR13443549.fastq.gz
+# 0639ec23552d6ff5f6fd03fdc2c563de  SRR13443553.fastq.gz
+# 838ffe4696d2ca4e1545a533bf8dc450  SRR13443554.fastq.gz
+# e69b3869609a59aaebaa143904c7edf3  SRR14362271_1.fastq.gz
+# a9a1d6d99b5335ebf7f65efe89782a0c  SRR14362271_2.fastq.gz
+# 6260ef37666965814587a39792f61e07  SRR14362272_1.fastq.gz
+# b2897843281890540530dbfb5e2ece16  SRR14362272_2.fastq.gz
+# ff4995efc2f931cc4b35cc56d5ab7324  SRR14362275_1.fastq.gz
+# 46a5c6651d1b7e3153eb2976794ff7cc  SRR14362275_2.fastq.gz
+# 06202182d3e3c9c32ccc957a440c7176  SRR14362276_1.fastq.gz
+# 4c938feea42532eea6aee709f8ca46df  SRR14362276_2.fastq.gz
+# c923c0b7ed80e4b8a396e6ab2b33e6ca  SRR14362281_1.fastq.gz
+# a3496dffea0ab3eecb2e9253953e302f  SRR14362281_2.fastq.gz
+# afc7182bedb6d4a9b93308bba235fa7b  SRR14362282_1.fastq.gz
+# e183b449c01a574d6c5fb4861e753230  SRR14362282_2.fastq.gz
+# d9c2fff6da973c66e93a9c747c4ce587  SRR3595211_1.fastq.gz
+# 2d0cde1499d18225c4f65746a0832b4a  SRR3595211_2.fastq.gz
+# 22c9367d651462327e25a01b11cf8bce  SRR3595212_1.fastq.gz
+# ba0e915bbb587b562f5cfe4723521893  SRR3595212_2.fastq.gz
+# 5a0cb0d75c67239c40031b5046f954b7  SRR3595213_1.fastq.gz
+# e568383fa7f65d5ef8d34395012a944b  SRR3595213_2.fastq.gz
+# d2704eabde9487fac8b21617afc4ad71  SRR3595214_1.fastq.gz
+# 7acc0d714ac4ef99e6b5c37d24321335  SRR3595214_2.fastq.gz
 cd /scratch/wangq/xrz/ATAC_brain/mouse/sequence
-
-
-
+md5sum *.fastq.gz
+# e7c21902b5f6228c04bfefc4c7605d3d  SRR11179779_1.fastq.gz
+# a17f0de8bb0baf6d9612e6cca491420c  SRR11179779_2.fastq.gz
+# 642e3990eca76e041138f0d1dc12f9a1  SRR11179780_1.fastq.gz
+# b3cbea2262204638e15b2fb4727f4337  SRR11179780_2.fastq.gz
+# b8721636cf9ec8ac56502f5a430fbf62  SRR11179781_1.fastq.gz
+# be248c9c98d6457ad4602d83efc85d29  SRR11179781_2.fastq.gz
+# 8146a8f87792beaafa66da54106523d8  SRR13049359_1.fastq.gz
+# 10bf9afbee98da9265ec19de38c8a2bc  SRR13049359_2.fastq.gz
+# 7caf7e99e7948298e6a63e826933537a  SRR13049360_1.fastq.gz
+# 30b5cfef2978503998369c9d44674720  SRR13049360_2.fastq.gz
+# 4149b45bd8e854d5b93a2a13e62b9529  SRR13049361_1.fastq.gz
+# deba00dd254e75092ca3ae2efeabaff6  SRR13049361_2.fastq.gz
+# 990cf81d4e9a11d1e8cfb5cf4795db4c  SRR13049362_1.fastq.gz
+# 0bba68428f864feb3d0052e6e8024c84  SRR13049362_2.fastq.gz
+# 0fefd64e285d298dbf7c9516bf5c15e2  SRR13049363_1.fastq.gz
+# b8fbd54a787d43b16b62a9db59c0a5c5  SRR13049363_2.fastq.gz
+# 6729a52e1ec94690ac3134e5d0db71f4  SRR13049364_1.fastq.gz
+# e878afe75d759c37bc3c9aeb08601d96  SRR13049364_2.fastq.gz
+# b2276393d4aff553f4062996c88db88b  SRR13443549.fastq.gz
+# 0639ec23552d6ff5f6fd03fdc2c563de  SRR13443553.fastq.gz
+# 838ffe4696d2ca4e1545a533bf8dc450  SRR13443554.fastq.gz
+# e69b3869609a59aaebaa143904c7edf3  SRR14362271_1.fastq.gz
+# a9a1d6d99b5335ebf7f65efe89782a0c  SRR14362271_2.fastq.gz
+# 6260ef37666965814587a39792f61e07  SRR14362272_1.fastq.gz
+# b2897843281890540530dbfb5e2ece16  SRR14362272_2.fastq.gz
+# ff4995efc2f931cc4b35cc56d5ab7324  SRR14362275_1.fastq.gz
+# 46a5c6651d1b7e3153eb2976794ff7cc  SRR14362275_2.fastq.gz
+# 06202182d3e3c9c32ccc957a440c7176  SRR14362276_1.fastq.gz
+# 4c938feea42532eea6aee709f8ca46df  SRR14362276_2.fastq.gz
+# c923c0b7ed80e4b8a396e6ab2b33e6ca  SRR14362281_1.fastq.gz
+# a3496dffea0ab3eecb2e9253953e302f  SRR14362281_2.fastq.gz
+# afc7182bedb6d4a9b93308bba235fa7b  SRR14362282_1.fastq.gz
+# e183b449c01a574d6c5fb4861e753230  SRR14362282_2.fastq.gz
+# d9c2fff6da973c66e93a9c747c4ce587  SRR3595211_1.fastq.gz
+# 2d0cde1499d18225c4f65746a0832b4a  SRR3595211_2.fastq.gz
+# 22c9367d651462327e25a01b11cf8bce  SRR3595212_1.fastq.gz
+# ba0e915bbb587b562f5cfe4723521893  SRR3595212_2.fastq.gz
+# 5a0cb0d75c67239c40031b5046f954b7  SRR3595213_1.fastq.gz
+# e568383fa7f65d5ef8d34395012a944b  SRR3595213_2.fastq.gz
+# d2704eabde9487fac8b21617afc4ad71  SRR3595214_1.fastq.gz
+# 7acc0d714ac4ef99e6b5c37d24321335  SRR3595214_2.fastq.gz
 ```
 2. 基因组数据
 
 # 3. 比对前质控
+* 本地质控，先不要执行  
+```bash 
+mkdir -p /mnt/xuruizhi/ATAC_brain/mouse/fastqc
+# 查看测序质量
+cd /mnt/xuruizhi/ATAC_brain/mouse/sequence
+fastqc -t 6 -o /mnt/xuruizhi/ATAC_brain/mouse/fastqc *.gz
+cd /mnt/xuruizhi/ATAC_brain/mouse/fastqc
+multiqc .
+
+# 质控
+mkdir -p /mnt/xuruizhi/ATAC_brain/mouse/trim
+cd /mnt/xuruizhi/ATAC_brain/mouse/sequence
+# 双端测序
+ls *_1.fastq.gz | sed 's/_1.fastq.gz//g'  >pair.list
+trim_dir=/mnt/xuruizhi/ATAC_brain/mouse/trim
+cat pair.list | parallel --no-run-if-empty --linebuffer -k -j 8 ' \
+trim_galore --phred33 --length 35 -e 0.1 --stringency 3 --paired \
+-o /mnt/xuruizhi/ATAC_brain/mouse/trim  {}_1.fastq.gz  {}_2.fastq.gz'
+# 单端测序
+cd /mnt/xuruizhi/ATAC_brain/mouse/sequence
+cat >single.list <<EOF
+SRR13443549
+SRR13443553
+SRR13443554
+EOF
+cat single.list | while read id
+do 
+  trim_galore --phred33 --length 35 -e 0.1 --stringency 3 \
+  -o /mnt/xuruizhi/ATAC_brain/mouse/trim ${id}.fastq.gz
+done
+```
+* 本地循环，执行
+```bash
+# 双端
+ls *_1.fastq.gz | sed 's/_1.fastq.gz//g'  >pair.list
+cd /mnt/xuruizhi/ATAC_brain/mouse/sequence
+
+cat >mouse_pair.sh <<EOF
+#!/usr/bin bash
+# This script is for pari-end sequence.
+
+# sra2fq.sh
+# fastq-dump --gzip --split-3 -O /mnt/xuruizhi/ATAC_brain/mouse/sequence /mnt/xuruizhi/ATAC_brain/mouse/sra/{}/{}.sra
+
+# fastqc
+# fastqc -t 6 -o /mnt/xuruizhi/ATAC_brain/mouse/fastqc /mnt/xuruizhi/ATAC_brain/mouse/sequence/{}_1.fastq.gz
+# fastqc -t 6 -o /mnt/xuruizhi/ATAC_brain/mouse/fastqc /mnt/xuruizhi/ATAC_brain/mouse/sequence/{}_2.fastq.gz
+
+# trim
+trim_galore --phred33 --length 35 -e 0.1 --stringency 3 --paired \
+-o /mnt/xuruizhi/ATAC_brain/mouse/trim  {}_1.fastq.gz  {}_2.fastq.gz
+
+# fatsqc_again
+fastqc -t 6 -o /mnt/xuruizhi/ATAC_brain/mouse/fastqc_again /mnt/xuruizhi/ATAC_brain/mouse/trim/{}_1.fastq.gz
+fastqc -t 6 -o /mnt/xuruizhi/ATAC_brain/mouse/fastqc_again /mnt/xuruizhi/ATAC_brain/mouse/trim/{}_2.fastq.gz
+EOF
+
+cat pair.list | while read id
+do
+  sed "s/{}/${id}/g" mouse_pair.sh > ${id}_pair_trim.sh
+done
+cat pair.list | parallel --no-run-if-empty --linebuffer -k -j 6 " 
+  bash {}_pair_trim.sh >> ./trim_fastqc.log 2>&1"
+
+
+# 单端
+cd /mnt/xuruizhi/ATAC_brain/mouse/sequence
+cat >single.list <<EOF
+SRR13443549
+SRR13443553
+SRR13443554
+EOF
+cat single.list | parallel --no-run-if-empty --linebuffer -k -j 6 " 
+  bash {}_sra2fq.sh"
+
+
+
+# 单端测序
+cd /mnt/xuruizhi/brain/fastq/mouse
+cat >single.list <<EOF
+SRR13443549.fastq.gz
+SRR13443553.fastq.gz
+SRR13443554.fastq.gz
+EOF
+cat single.list | while read id
+do 
+  trim_galore --phred33 --length 35 -e 0.1 --stringency 3 \
+  -o /mnt/xuruizhi/brain/trim/mouse ${id}
+done
+
+# 再次质控
+mkdir -p /mnt/xuruizhi/brain/fastqc_again/mouse/
+fastqc -t 6 -o /mnt/xuruizhi/brain/fastqc_again/mouse/ /mnt/xuruizhi/brain/trim/mouse/*.gz
+cd  /mnt/xuruizhi/brain/fastqc_again/mouse/
+multiqc .
+```
+```
+# 传到超算
+mkdir -p /share/home/wangq/xuruizhi/brain/brain/trim/
+rsync -av /mnt/xuruizhi/brain/trim/ \
+wangq@202.119.37.251:/share/home/wangq/xuruizhi/brain/brain/trim/
+mkdir -p /share/home/wangq/xuruizhi/brain/brain/fastqc_again/mouse/
+rsync -av /mnt/xuruizhi/brain/fastqc_again/ \
+wangq@202.119.37.251:/share/home/wangq/xuruizhi/brain/brain/fastqc_again/
+```
