@@ -475,6 +475,7 @@ cat name.list
 # SRR3595213
 # SRR3595214
 
+# 此处输入文件选择错误，应选择trimmed结尾的文件，而不是val结尾的
 cd ~/xuruizhi/brain/brain/trim/mouse/
 bsub -q mpi -n 24 -J align -o ~/xuruizhi/brain/brain/alignment/mouse " 
 cat ~/xuruizhi/brain/brain/trim/mouse/pair.list | \

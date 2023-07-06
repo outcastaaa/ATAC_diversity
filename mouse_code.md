@@ -237,10 +237,13 @@ done
 ```
 * 本地循环，执行
 ```bash
+mkdir -p /mnt/xuruizhi/ATAC_brain/mouse/trim
+mkdir -p /mnt/xuruizhi/ATAC_brain/mouse/fastqc_again
+
 # 双端
 ls *_1.fastq.gz | sed 's/_1.fastq.gz//g'  >pair.list
 cd /mnt/xuruizhi/ATAC_brain/mouse/sequence
-
+# 循环脚本
 cat >mouse_pair.sh <<EOF
 #!/usr/bin bash
 # This script is for pari-end sequence.
@@ -276,36 +279,114 @@ SRR13443549
 SRR13443553
 SRR13443554
 EOF
-cat single.list | parallel --no-run-if-empty --linebuffer -k -j 6 " 
-  bash {}_sra2fq.sh"
 
+# 循环脚本
+cat >mouse_single.sh <<EOF
+#!/usr/bin bash
+# This script is for single-end sequence.
 
+# sra2fq.sh
+# fastq-dump --gzip --split-3 -O /mnt/xuruizhi/ATAC_brain/mouse/sequence /mnt/xuruizhi/ATAC_brain/mouse/sra/{}/{}.sra
 
-# 单端测序
-cd /mnt/xuruizhi/brain/fastq/mouse
-cat >single.list <<EOF
-SRR13443549.fastq.gz
-SRR13443553.fastq.gz
-SRR13443554.fastq.gz
+# fastqc
+# fastqc -t 6 -o /mnt/xuruizhi/ATAC_brain/mouse/fastqc /mnt/xuruizhi/ATAC_brain/mouse/sequence/{}.fastq.gz
+
+# trim
+trim_galore --phred33 --length 35 -e 0.1 --stringency 3 -o /mnt/xuruizhi/ATAC_brain/mouse/trim {}.fastq.gz
+
+# fatsqc_again
+fastqc -t 6 -o /mnt/xuruizhi/ATAC_brain/mouse/fastqc_again /mnt/xuruizhi/ATAC_brain/mouse/trim/{}.fastq.gz
 EOF
+
 cat single.list | while read id
-do 
-  trim_galore --phred33 --length 35 -e 0.1 --stringency 3 \
-  -o /mnt/xuruizhi/brain/trim/mouse ${id}
+do
+  sed "s/{}/${id}/g" mouse_single.sh > ${id}_single_trim.sh
+  bash ${id}_single_trim.sh >> ./trim_fastqc.log 2>&1
 done
 
-# 再次质控
-mkdir -p /mnt/xuruizhi/brain/fastqc_again/mouse/
-fastqc -t 6 -o /mnt/xuruizhi/brain/fastqc_again/mouse/ /mnt/xuruizhi/brain/trim/mouse/*.gz
-cd  /mnt/xuruizhi/brain/fastqc_again/mouse/
+cd  /mnt/xuruizhi/ATAC_brain/mouse/fastqc_again
 multiqc .
 ```
-```
+```bash
 # 传到超算
-mkdir -p /share/home/wangq/xuruizhi/brain/brain/trim/
-rsync -av /mnt/xuruizhi/brain/trim/ \
-wangq@202.119.37.251:/share/home/wangq/xuruizhi/brain/brain/trim/
-mkdir -p /share/home/wangq/xuruizhi/brain/brain/fastqc_again/mouse/
-rsync -av /mnt/xuruizhi/brain/fastqc_again/ \
-wangq@202.119.37.251:/share/home/wangq/xuruizhi/brain/brain/fastqc_again/
+# sequence后来的补充内容没有上传到超算
+rsync -av /mnt/xuruizhi/ATAC_brain/mouse/trim \
+wangq@202.119.37.251:/scratch/wangq/xrz/ATAC_brain/mouse/
+rsync -av /mnt/xuruizhi/ATAC_brain/mouse/fastqc \
+wangq@202.119.37.251:/scratch/wangq/xrz/ATAC_brain/mouse/
+rsync -av /mnt/xuruizhi/ATAC_brain/mouse/fastqc_again \
+wangq@202.119.37.251:/scratch/wangq/xrz/ATAC_brain/mouse/
+```
+
+
+# 4. 比对
+
+1. 参考基因组  
+```bash
+# 小鼠 mm10 的 bowtie2 的 index 已经建立过，在超算中处理
+mkdir -p /mnt/xuruizhi/ATAC_brain/mouse/genome
+cp /mnt/d/atac/genome/* /mnt/xuruizhi/ATAC_brain/mouse/genome/
+# 进入超算
+mkdir -p /scratch/wangq/xrz/ATAC_brain/mouse/genome
+cp /share/home/wangq/xuruizhi/brain/brain/genome/mouse/* /scratch/wangq/xrz/ATAC_brain/mouse/genome/
+```
+
+2. 比对
+```bash
+mkdir -p /scratch/wangq/xrz/ATAC_brain/mouse/align/
+# 循环 
+cd /scratch/wangq/xrz/ATAC_brain/mouse/trim
+rsync -av /mnt/xuruizhi/ATAC_brain/mouse/sequence/pair.list \
+wangq@202.119.37.251:/scratch/wangq/xrz/ATAC_brain/mouse/trim/
+rsync -av /mnt/xuruizhi/ATAC_brain/mouse/sequence/single.list \
+wangq@202.119.37.251:/scratch/wangq/xrz/ATAC_brain/mouse/trim/
+
+# 双端
+bowtie2  -p 48 -x /scratch/wangq/xrz/ATAC_brain/mouse/genome/mm10 \
+--very-sensitive -X 2000 -1 /scratch/wangq/xrz/ATAC_brain/mouse/trim/{}_1_trimmed.fq.gz \
+-2 /scratch/wangq/xrz/ATAC_brain/mouse/trim/{}_2_trimmed.fq.gz \
+-S /scratch/wangq/xrz/ATAC_brain/mouse/align/{}.sam
+
+# 单端
+bowtie2  -p 48 -x /scratch/wangq/xrz/ATAC_brain/mouse/genome/mm10 \
+--very-sensitive -X 2000 -U /scratch/wangq/xrz/ATAC_brain/mouse/trim/{}_trimmed.fq.gz \
+-S /scratch/wangq/xrz/ATAC_brain/mouse/align/{}.sam
+```
+
+3. sort_transfertobam_index  
+```bash
+mkdir -p /scratch/wangq/xrz/ATAC_brain/mouse/sort_bam
+# 双端与单端一致
+samtools sort -@ 48 /scratch/wangq/xrz/ATAC_brain/mouse/align/{}.sam \
+> /scratch/wangq/xrz/ATAC_brain/mouse/sort_bam/{}.sort.bam
+samtools index -@ 48 /scratch/wangq/xrz/ATAC_brain/mouse/sort_bam/{}.sort.bam
+samtools flagstat  -@ 48 /scratch/wangq/xrz/ATAC_brain/mouse/sort_bam/{}.sort.bam \
+> /scratch/wangq/xrz/ATAC_brain/mouse/sort_bam/{}.raw.stat
+```
+4. 大批量处理
+```bash
+cd /scratch/wangq/xrz/ATAC_brain/mouse/trim
+# 双端 
+cat pair.list  | while read id
+do 
+  sed "s/{}/${id}/g" mouse_pair.sh > ${id}_pair_align.sh;
+  bsub -q mpi -n 48 -o ../align "
+  bash  ${id}_pair_align.sh >> ../align/align.log 2>&1"
+done
+# 单端
+cat single.list  | while read id
+do 
+  sed "s/{}/${id}/g" mouse_single.sh > ${id}_single_align.sh;
+  bsub -q mpi -n 48 -o ../align "
+  bash ${id}_single_align.sh >> ../align/align.log 2>&1"
+done
+```
+
+4. 传到本地
+
+
+
+## 大批量转化
+```bash
+
 ```
