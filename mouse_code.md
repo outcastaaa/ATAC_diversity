@@ -372,16 +372,17 @@ done
 
 4. 传到本地
 ```bash
-rsync -av wangq@202.119.37.251:/scratch/wangq/xrz/ATAC_brain/mouse/align \
-/mnt/xuruizhi/ATAC_brain/mouse/
-rsync -av wangq@202.119.37.251:/scratch/wangq/xrz/ATAC_brain/mouse/sort_bam \
-/mnt/xuruizhi/ATAC_brain/mouse/
+# 通过beyond compare传输
+# 太大了，先不传输
 ```
-
+5. 比对结果
+```bash
+# 比对率都可以在90以上
+```
 # 5. post-alignment
 ```bash
 cd /scratch/wangq/xrz/ATAC_brain/mouse/sort_bam
-
+# 下面list删掉了质控不好的
 cat >MOUSE.list <<EOF
 SRR11179780
 SRR11179781
@@ -441,18 +442,23 @@ samtools flagstat -@ 96 ../filter/{}.filter.bam > ../filter/{}.filter.stat
 3. 大批量处理
 ```bash
 cd /scratch/wangq/xrz/ATAC_brain/mouse/sort_bam
+
+# 因为picard提交任务报错，直接跑
+picard MarkDuplicates -I ./SRR3595211.sort.bam -O ../rmdup/SRR3595211.rmdup.bam  -REMOVE_DUPLICATES true -VALIDATION_STRINGENCY LENIENT -METRICS_FILE ../rmdup/SRR3595211.log
+
+cp MOUSE.list ../rmdup/
 cat MOUSE.list | while read id
 do
-  sed "s/{}/${id}/g" mouse_common.sh > ${id}_common.sh
-  bsub -q mpi -n 96 -o ../filter "
-  bash ${id}_common.sh >> ../filter/filter.log 2>&1"
+  sed "s/{}/${id}/g" mouse_common.sh > ${id}_filter.sh
+  bsub -q mpi -n 48 -o ../filter "
+  bash ${id}_filter.sh >> ../filter/filter.log 2>&1"
 done
 ```
 
 
 4. Blacklist filtering
 
-```
+```bash
 
 cat name_new.list  | while read id; do sed "s/{}/${id}/g" filter.sh > ${id}_filter.sh; done
 
