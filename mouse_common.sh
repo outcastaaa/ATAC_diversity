@@ -9,6 +9,6 @@ samtools index -@ 48 ./{}.rmdup.bam
 samtools flagstat -@ 48 ./{}.rmdup.bam > ./{}.rmdup.stat
 
 # rm chrM etal
-samtools view -h -f 2 -q 30 ./{}.rmdup.bam | grep -v  chrM | samtools sort -@ 48 -O bam  -o ../filter/{}.filter.bam
+samtools view -h -F 1804 -q 30 -f 2 ./{}.rmdup.bam | grep -v  chrM | samtools sort -@ 48 -O bam  -o ../filter/{}.filter.bam
 samtools index -@ 48 ../filter/{}.filter.bam
 samtools flagstat -@ 48 ../filter/{}.filter.bam > ../filter/{}.filter.stat

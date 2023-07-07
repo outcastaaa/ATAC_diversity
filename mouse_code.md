@@ -378,6 +378,23 @@ done
 5. 比对结果
 ```bash
 # 比对率都可以在90以上
+cat SRR14362282.raw.stat
+92865004 + 0 in total (QC-passed reads + QC-failed reads)
+92865004 + 0 primary
+0 + 0 secondary
+0 + 0 supplementary
+0 + 0 duplicates
+0 + 0 primary duplicates
+91508313 + 0 mapped (98.54% : N/A)
+91508313 + 0 primary mapped (98.54% : N/A)
+92865004 + 0 paired in sequencing
+46432502 + 0 read1
+46432502 + 0 read2
+90382150 + 0 properly paired (97.33% : N/A)
+90816946 + 0 with itself and mate mapped
+691367 + 0 singletons (0.74% : N/A)
+29134 + 0 with mate mapped to a different chr
+8432 + 0 with mate mapped to a different chr (mapQ>=5)
 ```
 # 5. post-alignment
 ```bash
@@ -428,28 +445,38 @@ samtools flagstat -@ 96 ../rmdup/{}.rmdup.bam > ../rmdup/${sample}.rmdup.stat
 2. remove bad quality reads and chrM reads
 ```bash
 mkdir -p /scratch/wangq/xrz/ATAC_brain/mouse/filter
-cd /scratch/wangq/xrz/ATAC_brain/mouse/sort_bam
+cd /scratch/wangq/xrz/ATAC_brain/mouse/rmdup
+cp ../trim/*.list ./
+# 双端
+vim mouse_pair.sh
+samtools view -h -f 2 -F 1804 -q 30 ../rmdup/{}.rmdup.bam | grep -v  chrM | samtools sort -@ 48 -O bam  -o ../filter/{}.filter.bam
+samtools index -@ 48 ../filter/{}.filter.bam
+samtools flagstat -@ 48 ../filter/{}.filter.bam > ../filter/{}.filter.stat
 
-vim mouse_common.sh
-#!/usr/bin bash
-
-samtools view -h -f 2 -q 30 ../rmdup/{}.rmdup.bam | grep -v  chrM | samtools sort -@ 96 -O bam  -o ../filter/{}.filter.bam
-samtools index -@ 96 ../filter/{}.filter.bam
-samtools flagstat -@ 96 ../filter/{}.filter.bam > ../filter/{}.filter.stat
+# 单端
+samtools view -h -F 1804 -q 30 ../rmdup/{}.rmdup.bam | grep -v  chrM | samtools sort -@ 48 -O bam  -o ../filter/{}.filter.bam
+samtools index -@ 48 ../filter/{}.filter.bam
+samtools flagstat -@ 48 ../filter/{}.filter.bam > ../filter/{}.filter.stat
 ```
 
 
 3. 大批量处理
 ```bash
 cd /scratch/wangq/xrz/ATAC_brain/mouse/sort_bam
-
 # 因为picard提交任务报错，直接跑
 picard MarkDuplicates -I ./SRR3595211.sort.bam -O ../rmdup/SRR3595211.rmdup.bam  -REMOVE_DUPLICATES true -VALIDATION_STRINGENCY LENIENT -METRICS_FILE ../rmdup/SRR3595211.log
 
-cp MOUSE.list ../rmdup/
-cat MOUSE.list | while read id
+
+cd /scratch/wangq/xrz/ATAC_brain/mouse/rmdup
+cat pair.list | while read id
 do
-  sed "s/{}/${id}/g" mouse_common.sh > ${id}_filter.sh
+  sed "s/{}/${id}/g" mouse_pair.sh > ${id}_filter.sh
+  bsub -q mpi -n 48 -o ../filter "
+  bash ${id}_filter.sh >> ../filter/filter.log 2>&1"
+done
+cat single.list | while read id
+do
+  sed "s/{}/${id}/g" mouse_single.sh > ${id}_filter.sh
   bsub -q mpi -n 48 -o ../filter "
   bash ${id}_filter.sh >> ../filter/filter.log 2>&1"
 done
@@ -459,20 +486,118 @@ done
 4. Blacklist filtering
 
 ```bash
+# beyond compare传输到本地
+mkdir -p /mnt/xuruizhi/ATAC_brain/mouse/blklist
+mkdir -p /mnt/xuruizhi/ATAC_brain/mouse/final
+# 下载对应物种的 blacklist.bed文件
+wc -l  mm10.blacklist.bed #164
+cp /mnt/d/ATAC/blklist/mm10.blacklist.bed /mnt/xuruizhi/ATAC_brain/mouse/blklist
 
-cat name_new.list  | while read id; do sed "s/{}/${id}/g" filter.sh > ${id}_filter.sh; done
+cd /mnt/xuruizhi/ATAC_brain/mouse/filter
+cat >MOUSE.list <<EOF
+SRR11179780
+SRR11179781
+SRR13049359
+SRR13049362
+SRR13049363
+SRR13049364
+SRR14362271
+SRR14362272
+SRR14362275
+SRR14362276
+SRR14362281
+SRR14362282
+SRR3595211
+SRR3595212
+SRR3595213
+SRR3595214
+SRR13443549
+SRR13443553
+SRR13443554
+EOF
 
-cat name_new.list | while read id
-do
-  bsub -q mpi -n 48 -o ~/xuruizhi/brain/brain/filter_new/mouse "bash ${id}_filter.sh"
-done
-# Job <8604250-263> is submitted to queue <mpi>.
+# 取交集看bam文件和blacklist有多少重合部分
+# 凡是bam中含有blacklist都删除
+cat MOUSE.list | parallel -k -j 6 "
+  echo {} 
+  echo "{}.filter.bam"
+  bedtools intersect -wa -a {}.filter.bam -b ../blklist/mm10.blacklist.bed | \
+  wc -l  > ../blklist/{}.intersect.list
+
+  bedtools intersect -v -a {}.filter.bam -b ../blklist/mm10.blacklist.bed > ../final/{}.final.bam
+  samtools index ../final/{}.final.bam
+  samtools flagstat ../final/{}.final.bam > ../final/{}.final.stat
+"
 ```
+5. 结果解读：  
+```bash
+# 原比对文件数据，以SRR13049361为例
+cat SRR14362282.raw.stat
+92865004 + 0 in total (QC-passed reads + QC-failed reads)
+92865004 + 0 primary
+0 + 0 secondary
+0 + 0 supplementary
+0 + 0 duplicates
+0 + 0 primary duplicates
+91508313 + 0 mapped (98.54% : N/A)
+91508313 + 0 primary mapped (98.54% : N/A)
+92865004 + 0 paired in sequencing
+46432502 + 0 read1
+46432502 + 0 read2
+90382150 + 0 properly paired (97.33% : N/A)
+90816946 + 0 with itself and mate mapped
+691367 + 0 singletons (0.74% : N/A)
+29134 + 0 with mate mapped to a different chr
+8432 + 0 with mate mapped to a different chr (mapQ>=5)
+
+# 删除PCR重复+低质量+chrM后数据
+# rmdup
+72786670 + 0 in total (QC-passed reads + QC-failed reads)
+72786670 + 0 primary
+0 + 0 secondary
+0 + 0 supplementary
+0 + 0 duplicates
+0 + 0 primary duplicates
+71429979 + 0 mapped (98.14% : N/A)
+71429979 + 0 primary mapped (98.14% : N/A)
+72786670 + 0 paired in sequencing
+36359425 + 0 read1
+36427245 + 0 read2
+70627278 + 0 properly paired (97.03% : N/A)
+70971626 + 0 with itself and mate mapped
+458353 + 0 singletons (0.63% : N/A)
+25462 + 0 with mate mapped to a different chr
+8250 + 0 with mate mapped to a different chr (mapQ>=5)
+# filter
+61465170 + 0 in total (QC-passed reads + QC-failed reads)
+61465170 + 0 primary
+0 + 0 secondary
+0 + 0 supplementary
+0 + 0 duplicates
+0 + 0 primary duplicates
+61465170 + 0 mapped (100.00% : N/A)
+61465170 + 0 primary mapped (100.00% : N/A)
+61465170 + 0 paired in sequencing
+30732585 + 0 read1
+30732585 + 0 read2
+61465170 + 0 properly paired (100.00% : N/A)
+61465170 + 0 with itself and mate mapped
+0 + 0 singletons (0.00% : N/A)
+0 + 0 with mate mapped to a different chr
+0 + 0 with mate mapped to a different chr (mapQ>=5)
+
+# 删除blacklist后数据
+
+```
+到这一步，比对文件已经过滤完成。   
 
 
+6. bamtobed
+```bash
+mkdir -p /mnt/xuruizhi/ATAC_brain/mouse/bed
 
-
-
+ bedtools bamtobed -i ./{1} >../../bed/mouse/{1}.bed
+```
 
 
 
