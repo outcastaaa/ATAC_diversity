@@ -531,7 +531,7 @@ cat MOUSE.list | parallel -k -j 6 "
 ```
 5. 结果解读：  
 ```bash
-# 原比对文件数据，以SRR13049361为例
+# 原比对文件数据
 cat SRR14362282.raw.stat
 92865004 + 0 in total (QC-passed reads + QC-failed reads)
 92865004 + 0 primary
@@ -587,49 +587,308 @@ cat SRR14362282.raw.stat
 0 + 0 with mate mapped to a different chr (mapQ>=5)
 
 # 删除blacklist后数据
-
+61430470 + 0 in total (QC-passed reads + QC-failed reads)
+61430470 + 0 primary
+0 + 0 secondary
+0 + 0 supplementary
+0 + 0 duplicates
+0 + 0 primary duplicates
+61430470 + 0 mapped (100.00% : N/A)
+61430470 + 0 primary mapped (100.00% : N/A)
+61430470 + 0 paired in sequencing
+30715234 + 0 read1
+30715236 + 0 read2
+61430470 + 0 properly paired (100.00% : N/A)
+61430470 + 0 with itself and mate mapped
+0 + 0 singletons (0.00% : N/A)
+0 + 0 with mate mapped to a different chr
+0 + 0 with mate mapped to a different chr (mapQ>=5)
 ```
 到这一步，比对文件已经过滤完成。   
 
-
-6. bamtobed
+# 6. Call peaks 
+1. bamtobed
 ```bash
 mkdir -p /mnt/xuruizhi/ATAC_brain/mouse/bed
-
- bedtools bamtobed -i ./{1} >../../bed/mouse/{1}.bed
+cd /mnt/xuruizhi/ATAC_brain/mouse/final
+bedtools bamtobed -i {}.final.bam > ../bed/{}.bed
 ```
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-批量提交
+2. shift reads
 ```bash
-rmdup_dir=/scratch/wangq/xrz/ATAC_brain/mouse/rmdup
-cd /scratch/wangq/xrz/ATAC_brain/mouse/sort_bam
+mkdir -p /mnt/xuruizhi/ATAC_brain/mouse/Tn5_shift
+cd /mnt/xuruizhi/ATAC_brain/mouse/bed
 
-cat name.list  | while read id; do sed "s/{}/${id}/g" rmdup.sh > ${id}_rmdup.sh; done
-cat name.list | while read id
-do
-  bsub -q largemem -n 48 -J rmdup -o $rmdup_dir "bash ${id}.sh"
+cat ../final/MOUSE.list | while read id;
+do 
+  echo $id 
+  cat ${id}.bed | awk -v OFS="\t" '{
+    if ($6 == "+") {
+        print $1, $2+4, $3+4;
+    } else if ($6 == "-") {
+        print $1, $2-5, $3-5;
+    }
+}' > ../Tn5_shift/${id}.Tn5.bed
 done
 ```
+3. Call peaks 
+```bash
+mkdir -p /mnt/xuruizhi/ATAC_brain/mouse/peaks
+cd /mnt/xuruizhi/ATAC_brain/mouse/Tn5_shift
+macs2 callpeak  -g mm \
+  --shift -75 --extsize 150 --nomodel \
+  --nolambda --keep-dup all \
+  -n {} -t ./{}.Tn5.bed \
+  --outdir ../peaks/
+```
+4. 批量处理
+```bash
+mkdir -p /mnt/xuruizhi/ATAC_brain/mouse/bed
+mkdir -p /mnt/xuruizhi/ATAC_brain/mouse/Tn5_shift
+mkdir -p /mnt/xuruizhi/ATAC_brain/mouse/peaks
+
+cd /mnt/xuruizhi/ATAC_brain/mouse/final
+cp /mnt/xuruizhi/ATAC_brain/mouse/filter/MOUSE.list ../final/
+cat MOUSE.list | while read id
+do
+  sed "s/{}/${id}/g" mouse_common.sh > ../peaks/${id}_callpeaks.sh
+done
+cat MOUSE.list | parallel --no-run-if-empty --linebuffer -k -j 6 " 
+  bash ../peaks/{}_callpeaks.sh >> ../peaks/peaks.log 2>&1"
+```
+
+# 7. Quality check  
+判断ATAC-seq是否合格的几个[Current Standards](https://www.encodeproject.org/atac-seq/)  
+
+* 实验重复 Experiments should have two or more biological replicates. √
+* 数据量 Each replicate should have 25 million non-duplicate, non-mitochondrial aligned reads for single-end sequencing and 50 million for paired-ended sequencing (i.e. 25 million fragments, regardless of sequencing run type). 
+```bash
+cat *.final.stat | grep 'read1'
+# SRR11179780.final.stat
+# 55174171 + 0 in total (QC-passed reads + QC-failed reads)
+# SRR11179781.final.stat    reads不够
+# 35179699 + 0 in total (QC-passed reads + QC-failed reads)
+# SRR13049359.final.stat    reads不够
+# 11652432 + 0 in total (QC-passed reads + QC-failed reads)
+# SRR13049362.final.stat
+# 57619495 + 0 in total (QC-passed reads + QC-failed reads)
+# SRR13049363.final.stat
+# 64637521 + 0 in total (QC-passed reads + QC-failed reads)
+# SRR13049364.final.stat    reads不够
+# 43270057 + 0 in total (QC-passed reads + QC-failed reads)
+# SRR13443549.final.stat
+# 50731638 + 0 in total (QC-passed reads + QC-failed reads)
+# SRR13443553.final.stat
+# 50592991 + 0 in total (QC-passed reads + QC-failed reads)
+# SRR13443554.final.stat    reads不够
+# 47570952 + 0 in total (QC-passed reads + QC-failed reads)
+# SRR14362271.final.stat    reads不够
+# 43903760 + 0 in total (QC-passed reads + QC-failed reads)
+# SRR14362272.final.stat
+# 97205176 + 0 in total (QC-passed reads + QC-failed reads)
+# SRR14362275.final.stat
+# 67693822 + 0 in total (QC-passed reads + QC-failed reads)
+# SRR14362276.final.stat
+# 78843819 + 0 in total (QC-passed reads + QC-failed reads)
+# SRR14362281.final.stat
+# 62889953 + 0 in total (QC-passed reads + QC-failed reads)
+# SRR14362282.final.stat
+# 61430470 + 0 in total (QC-passed reads + QC-failed reads)
+# SRR3595211.final.stat    reads不够
+# 10203178 + 0 in total (QC-passed reads + QC-failed reads)
+# SRR3595212.final.stat    reads不够
+# 14113255 + 0 in total (QC-passed reads + QC-failed reads)
+# SRR3595213.final.stat    reads不够
+# 5237407 + 0 in total (QC-passed reads + QC-failed reads)
+# SRR3595214.final.stat    reads不够
+# 7013056 + 0 in total (QC-passed reads + QC-failed reads)
+```
+* 比对率 The alignment rate, or percentage of mapped reads, should be greater than 95%, though values >80% may be acceptable. √
+* IDR value Replicate concordance is measured by calculating IDR values (Irreproducible Discovery Rate). The experiment passes if both rescue and self consistency ratios are less than 2.
+* Various peak files must meet certain requirements. Please visit the section on output files under the pipeline overview for more information on peak files.  
+** The number of peaks within a replicated peak file should be >150,000, though values >100,000 may be acceptable.   
+** The number of peaks within an IDR peak file should be >70,000, though values >50,000 may be acceptable.  
+** A nucleosome free region (NFR) must be present.  
+** A mononucleosome peak must be present in the fragment length distribution. These are reads that span a single nucleosome, so they are longer than 147 bp but shorter than 147*2 bp. Good ATAC-seq datasets have reads that span nucleosomes (which allows for calling nucleosome positions in addition to open regions of chromatin).  
+
+
+* The fraction of reads in called peak regions (FRiP score) should be >0.3, though values greater than 0.2 are acceptable. TSS enrichment remains in place as a key signal to noise measure.
+
+* Transcription start site (TSS) enrichment values are dependent on the reference files used; cutoff values for high quality data are listed in the table below.  
+
+
+| Annotation used              | Value  | Resulting Data Status  |
+|------------------------------|--------|------------------------|
+| mm10 Refseq TSS annotation   | < 10   | Concerning             |
+| mm10 Refseq TSS annotation   | 10--15 | Acceptable             |
+| mm10 Refseq TSS annotation   | > 15   | Ideal                  |
+
+1. fragment length distribution 一般只对于双端测序有意义
+```bash
+# 在Linux中画图  
+mkdir -p /mnt/xuruizhi/ATAC_brain/mouse/frag_length
+cd /mnt/xuruizhi/ATAC_brain/mouse/final
+
+cat MOUSE.list | parallel -k -j 6 "
+  echo {} 
+  java -jar /mnt/d/biosoft/picard/picard.jar CollectInsertSizeMetrics \
+  -I {}.final.bam \
+  -O ../frag_length/{}.insert_size_metrics.txt \
+  -H ../frag_length/{}.insert_size_histogram.pdf"
+```
+
+
+2.  FRiP 影响不大
+FRiP（Fraction of reads in peaks，Fraction of all mapped reads that fall into the called peak regions）表示的是位于peak区域的reads的比例，FRiP score是一个比值，其分子是位于peak区域的reads总数，分母是比对到参考基因组上的reads总数。  
+
+* 推荐使用未去重、只比对完后的bam文件，此步骤只使用最终文件看比例  
+
+
+```bash
+mkdir -p /mnt/xuruizhi/ATAC_brain/mouse/FRiP
+cd /mnt/xuruizhi/ATAC_brain/mouse/Tn5_shift
+cp ../final/MOUSE.list ./
+cat MOUSE.list | parallel -k -j 6 "
+  wc -l {}.Tn5.bed | awk '{print $1}' >> ../FRiP/bed_totalReads.txt
+  bedtools intersect -wa -a {}.Tn5.bed -b ../peaks/{}_peaks.narrowPeak \
+  | wc -l | awk '{print $1}' >> ../FRiP/bed_peakReads.txt
+
+  paste MOUSE.list ../FRiP/bed_totalReads.txt ../FRiP/bed_peakReads.txt > ../FRiP/bed_FRiP.txt
+  cat ../FRiP/bed_FRiP.txt | awk '{print $1, $2,$3,$2/$3*100"%"}' > ../FRiP/bed_FRiP.txt
+"
+```
+
+3. 长度统计
+
+```bash
+cat $i | awk '{print $3-$2}' | awk '{sum += $1} END {print avg = sum/NR}'
+```
+
+4. TSS enrichment在下一节展示，很重要的判断质量的标准
+# 8. Visualization    
+## 8.1 filterbam2Bw    
+```bash 
+mkdir -p  /mnt/xuruizhi/ATAC_brain/mouse/bw
+cd /mnt/xuruizhi/ATAC_brain/mouse/final
+conda activate py3.8
+ls *.bam | while read id; 
+do 
+  bamCoverage -p 6  -b $id \
+  -o ../bw/${id%%.*}.bw \
+  --binSize 20 \
+  --smoothLength 60 \
+  --normalizeUsing RPKM \
+  --centerReads 
+  >> ../bw/bamCoverage.log 2>&1
+done
+```
+
+## 8.2 TSS enrichment 
+
+下载TSS注释文件：the BED file which contains the coordinates for all genes [下载地址](http://rohsdb.cmb.usc.edu/GBshape/cgi-bin/hgTables?hgsid=6884883_WoMR8YyIAAVII92Rr1Am3Kd0jr5H&clade=mammal&org=Mouse&db=mm10&hgta_group=genes&hgta_track=knownGene&hgta_table=0&hgta_regionType=genome&position=chr12%3A56703576-56703740&hgta_outputType=primaryTable&hgta_outFileName=)   
+[参数选择](https://www.jianshu.com/p/d6cb795af22a)   
+
+将`mm10.reseq.bed`保存在 /mnt/d/ATAC/TSS 文件夹内。 
+```bash
+mkdir -p /mnt/xuruizhi/ATAC_brain/mouse/TSS
+cp /mnt/d/ATAC/TSS/mm10.refseq.bed /mnt/xuruizhi/ATAC_brain/mouse/TSS
+``` 
+
+
+* 每个样本单独画图  
+```bash
+# 在py3.8环境下运行
+
+cd /mnt/xuruizhi/brain/bw/mouse/
+mkdir -p /mnt/xuruizhi/brain/TSS/mouse
+# 循环
+ls *.bw | while read id; 
+do 
+  computeMatrix reference-point --referencePoint TSS -p 6 \
+    -b 1000  -a 1000 \
+    -R /mnt/xuruizhi/brain/TSS/mouse/mm10.refseq.bed \
+    -S $id \
+    --skipZeros \
+    -o /mnt/xuruizhi/brain/TSS/mouse/${id%%.*}_matrix.gz \
+    --outFileSortedRegions /mnt/xuruizhi/brain/TSS/mouse/${id%%.*}_regions.bed
+    2 > /mnt/xuruizhi/brain/TSS/mouse/${id%%.*}.log
+done
+
+
+# profile plot
+cd /mnt/xuruizhi/brain/TSS/mouse
+ls *.log | while read id; 
+do 
+  plotProfile -m /mnt/xuruizhi/brain/TSS/mouse/${id%%.*}_matrix.gz \
+    -out /mnt/xuruizhi/brain/TSS/mouse/${id%%.*}_profile.png \
+    --perGroup \
+    --colors green \
+    --plotTitle "" \
+    --refPointLabel "TSS" \
+    -T "${id%%.*} read density" \
+    -z ""
+done
+
+
+
+# heatmap and profile plot
+ls *.log | while read id; 
+do 
+  plotHeatmap -m /mnt/xuruizhi/brain/TSS/mouse/${id%%.*}_matrix.gz \
+    -out /mnt/xuruizhi/brain/TSS/mouse/${id%%.*}_heatmap.png \
+    --colorMap RdBu \
+    --zMin -12 --zMax 12
+done
+
+
+#单独heatmap
+ls *.log | while read id; 
+do
+plotHeatmap -m /mnt/xuruizhi/brain/TSS/mouse/${id%%.*}_matrix.gz \
+-out /mnt/xuruizhi/brain/TSS/mouse/${id%%.*}_heatmap2.png \
+--colorMap RdBu \
+--whatToShow 'heatmap and colorbar' \
+--zMin -8 --zMax 8  
+done
+mkdir -p /mnt/d/brain/brain/TSS/mouse/
+cp /mnt/xuruizhi/brain/TSS/mouse/* /mnt/d/brain/brain/TSS/mouse/
+```
+
+
+* 画 `gene body` 区，使用 `scale-regions`  
+```bash
+cd /mnt/xuruizhi/brain/bw/mouse
+mkdir -p /mnt/xuruizhi/brain/genebody/mouse/
+# create a matrix 
+ls *.bw | while read id; 
+do
+computeMatrix scale-regions -p 6 \
+    -b 10000  -a 10000 \
+    -R /mnt/xuruizhi/brain/TSS/mouse/mm10.refseq.bed \
+    -S ${id} \
+    --skipZeros \
+    -o /mnt/xuruizhi/brain/genebody/mouse/${id%%.*}_matrix.gz 
+done
+
+
+cd /mnt/xuruizhi/brain/genebody/mouse
+ls *.gz | while read id
+do
+  plotHeatmap -m ${id} -out ${id%%.*}_heatmap.png 
+done
+
+plotProfile -m /mnt/d/ATAC/genebody/SRR11539111_matrix.gz \
+    -out /mnt/d/ATAC/genebody/SRR11539111_profile.png 
+    #不太好看，还需要调整参数
+```
+
+
+
+
+
+
+
+
+
+
+
