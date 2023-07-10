@@ -706,7 +706,32 @@ cat *.final.stat | grep 'read1'
 * 比对率 The alignment rate, or percentage of mapped reads, should be greater than 95%, though values >80% may be acceptable. √
 * IDR value Replicate concordance is measured by calculating IDR values (Irreproducible Discovery Rate). The experiment passes if both rescue and self consistency ratios are less than 2.
 * Various peak files must meet certain requirements. Please visit the section on output files under the pipeline overview for more information on peak files.  
-** The number of peaks within a replicated peak file should be >150,000, though values >100,000 may be acceptable.   
+** The number of peaks within a replicated peak file should be >150,000, though values >100,000 may be acceptable.  
+```bash
+#  差不多
+cd /mnt/xuruizhi/ATAC_brain/mouse/peaks
+wc -l *.narrowPeak
+#    126857 SRR11179780_peaks.narrowPeak
+#    111102 SRR11179781_peaks.narrowPeak
+#    174276 SRR13049359_peaks.narrowPeak
+#    245020 SRR13049362_peaks.narrowPeak
+#    193402 SRR13049363_peaks.narrowPeak
+#    172142 SRR13049364_peaks.narrowPeak
+#     95584 SRR13443549_peaks.narrowPeak
+#    181380 SRR13443553_peaks.narrowPeak
+#     80903 SRR13443554_peaks.narrowPeak
+#    197143 SRR14362271_peaks.narrowPeak
+#    230309 SRR14362272_peaks.narrowPeak
+#    206593 SRR14362275_peaks.narrowPeak
+#    203466 SRR14362276_peaks.narrowPeak
+#    199754 SRR14362281_peaks.narrowPeak
+#    169213 SRR14362282_peaks.narrowPeak
+#    101655 SRR3595211_peaks.narrowPeak
+#    117018 SRR3595212_peaks.narrowPeak
+#     58525 SRR3595213_peaks.narrowPeak
+#     80972 SRR3595214_peaks.narrowPeak
+```
+
 ** The number of peaks within an IDR peak file should be >70,000, though values >50,000 may be acceptable.  
 ** A nucleosome free region (NFR) must be present.  
 ** A mononucleosome peak must be present in the fragment length distribution. These are reads that span a single nucleosome, so they are longer than 147 bp but shorter than 147*2 bp. Good ATAC-seq datasets have reads that span nucleosomes (which allows for calling nucleosome positions in addition to open regions of chromatin).  
@@ -741,9 +766,9 @@ cat MOUSE.list | parallel -k -j 6 "
 2.  FRiP 影响不大
 FRiP（Fraction of reads in peaks，Fraction of all mapped reads that fall into the called peak regions）表示的是位于peak区域的reads的比例，FRiP score是一个比值，其分子是位于peak区域的reads总数，分母是比对到参考基因组上的reads总数。  
 
-* 推荐使用未去重、只比对完后的bam文件，此步骤只使用最终文件看比例  
+* 推荐使用未去重、只比对完后的bam文件，后续使用diffbind来看
 
-
+* 输出结果错误
 ```bash
 mkdir -p /mnt/xuruizhi/ATAC_brain/mouse/FRiP
 cd /mnt/xuruizhi/ATAC_brain/mouse/Tn5_shift
@@ -754,7 +779,7 @@ cat MOUSE.list | parallel -k -j 6 "
   | wc -l | awk '{print $1}' >> ../FRiP/bed_peakReads.txt
 
   paste MOUSE.list ../FRiP/bed_totalReads.txt ../FRiP/bed_peakReads.txt > ../FRiP/bed_FRiP.txt
-  cat ../FRiP/bed_FRiP.txt | awk '{print $1, $2,$3,$2/$3*100"%"}' > ../FRiP/bed_FRiP.txt
+  cat ../FRiP/bed_FRiP.txt | awk '{print $1,$2,$3,$2/$3*100"%"}' > ../FRiP/bed_FRiP.txt
 "
 ```
 
@@ -765,8 +790,9 @@ cat $i | awk '{print $3-$2}' | awk '{sum += $1} END {print avg = sum/NR}'
 ```
 
 4. TSS enrichment在下一节展示，很重要的判断质量的标准
+
 # 8. Visualization    
-## 8.1 filterbam2Bw    
+1.  filterbam2Bw    
 ```bash 
 mkdir -p  /mnt/xuruizhi/ATAC_brain/mouse/bw
 cd /mnt/xuruizhi/ATAC_brain/mouse/final
@@ -783,44 +809,37 @@ do
 done
 ```
 
-## 8.2 TSS enrichment 
+2. TSS enrichment 
 
 下载TSS注释文件：the BED file which contains the coordinates for all genes [下载地址](http://rohsdb.cmb.usc.edu/GBshape/cgi-bin/hgTables?hgsid=6884883_WoMR8YyIAAVII92Rr1Am3Kd0jr5H&clade=mammal&org=Mouse&db=mm10&hgta_group=genes&hgta_track=knownGene&hgta_table=0&hgta_regionType=genome&position=chr12%3A56703576-56703740&hgta_outputType=primaryTable&hgta_outFileName=)   
 [参数选择](https://www.jianshu.com/p/d6cb795af22a)   
 
 将`mm10.reseq.bed`保存在 /mnt/d/ATAC/TSS 文件夹内。 
 ```bash
+# 在py3.8环境下运行
+conda activate py3.8
 mkdir -p /mnt/xuruizhi/ATAC_brain/mouse/TSS
 cp /mnt/d/ATAC/TSS/mm10.refseq.bed /mnt/xuruizhi/ATAC_brain/mouse/TSS
-``` 
 
-
-* 每个样本单独画图  
-```bash
-# 在py3.8环境下运行
-
-cd /mnt/xuruizhi/brain/bw/mouse/
-mkdir -p /mnt/xuruizhi/brain/TSS/mouse
-# 循环
+cd /mnt/xuruizhi/ATAC_brain/mouse/bw
 ls *.bw | while read id; 
 do 
   computeMatrix reference-point --referencePoint TSS -p 6 \
     -b 1000  -a 1000 \
-    -R /mnt/xuruizhi/brain/TSS/mouse/mm10.refseq.bed \
+    -R ../TSS/mm10.refseq.bed \
     -S $id \
     --skipZeros \
-    -o /mnt/xuruizhi/brain/TSS/mouse/${id%%.*}_matrix.gz \
-    --outFileSortedRegions /mnt/xuruizhi/brain/TSS/mouse/${id%%.*}_regions.bed
-    2 > /mnt/xuruizhi/brain/TSS/mouse/${id%%.*}.log
+    -o ../TSS/${id%%.*}_matrix.gz \
+    --outFileSortedRegions ../TSS/${id%%.*}_regions.bed
 done
 
 
 # profile plot
-cd /mnt/xuruizhi/brain/TSS/mouse
+cd ../TSS/
 ls *.log | while read id; 
 do 
-  plotProfile -m /mnt/xuruizhi/brain/TSS/mouse/${id%%.*}_matrix.gz \
-    -out /mnt/xuruizhi/brain/TSS/mouse/${id%%.*}_profile.png \
+  plotProfile -m ${id%%.*}_matrix.gz \
+    -out ${id%%.*}_profile.png \
     --perGroup \
     --colors green \
     --plotTitle "" \
@@ -829,57 +848,45 @@ do
     -z ""
 done
 
+# heatmap
+ls *.log | while read id; 
+do
+  plotHeatmap -m ${id%%.*}_matrix.gz \
+  -out ${id%%.*}_heatmap2.png \
+  --colorMap RdBu \
+  --whatToShow 'heatmap and colorbar' \
+  --zMin -8 --zMax 8  
+done
 
 
 # heatmap and profile plot
 ls *.log | while read id; 
 do 
-  plotHeatmap -m /mnt/xuruizhi/brain/TSS/mouse/${id%%.*}_matrix.gz \
-    -out /mnt/xuruizhi/brain/TSS/mouse/${id%%.*}_heatmap.png \
+  plotHeatmap -m ${id%%.*}_matrix.gz \
+    -out ${id%%.*}_heatmap.png \
     --colorMap RdBu \
     --zMin -12 --zMax 12
 done
 
 
-#单独heatmap
-ls *.log | while read id; 
-do
-plotHeatmap -m /mnt/xuruizhi/brain/TSS/mouse/${id%%.*}_matrix.gz \
--out /mnt/xuruizhi/brain/TSS/mouse/${id%%.*}_heatmap2.png \
---colorMap RdBu \
---whatToShow 'heatmap and colorbar' \
---zMin -8 --zMax 8  
-done
-mkdir -p /mnt/d/brain/brain/TSS/mouse/
-cp /mnt/xuruizhi/brain/TSS/mouse/* /mnt/d/brain/brain/TSS/mouse/
-```
-
-
-* 画 `gene body` 区，使用 `scale-regions`  
-```bash
-cd /mnt/xuruizhi/brain/bw/mouse
-mkdir -p /mnt/xuruizhi/brain/genebody/mouse/
+# 画 `gene body` 区，使用 `scale-regions`  
+cd ../bw
+mkdir -p ../genebody
 # create a matrix 
 ls *.bw | while read id; 
 do
 computeMatrix scale-regions -p 6 \
     -b 10000  -a 10000 \
-    -R /mnt/xuruizhi/brain/TSS/mouse/mm10.refseq.bed \
+    -R ../TSS/mm10.refseq.bed \
     -S ${id} \
     --skipZeros \
-    -o /mnt/xuruizhi/brain/genebody/mouse/${id%%.*}_matrix.gz 
+    -o ../genebody/${id%%.*}_matrix.gz 
 done
 
-
-cd /mnt/xuruizhi/brain/genebody/mouse
-ls *.gz | while read id
+ls ../genebody/*.gz | while read id
 do
   plotHeatmap -m ${id} -out ${id%%.*}_heatmap.png 
 done
-
-plotProfile -m /mnt/d/ATAC/genebody/SRR11539111_matrix.gz \
-    -out /mnt/d/ATAC/genebody/SRR11539111_profile.png 
-    #不太好看，还需要调整参数
 ```
 
 
