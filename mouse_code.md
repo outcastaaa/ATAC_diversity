@@ -3,11 +3,13 @@
 - [2. 下载数据](#2-下载数据)
 - [3. 比对前质控](#3-比对前质控)
 - [4. 比对](#4-比对)
-- [5. 比对后过滤](#5-post-alignment-processing)
-- [6. Tn5转换](#6-shift-reads)
-- [7. call peak](#7-call-peaks)
-- [8. 可视化](#8-visualization)
-- [9. 相同组织rep间consensus peak](#9-寻找rep间consensus-peak)  
+- [5. post-alignment](#5-post-alignment)
+- [6. call peak](#6-call-peaks)
+- [7. Quality cheak](#7-quality-check)
+- [8. Visualization](#8-visualization)
+- [9. 相同组织rep间consensus peak](#9-寻找rep间consensus-peak) 
+
+
 - [10. 不同组织可重复peak](#10-不同组织可重复peak)  
 - [9. diffbind](#9-使用diffbind做主成分分析)
 
@@ -836,23 +838,23 @@ done
 
 # profile plot
 cd ../TSS/
-ls *.log | while read id; 
+cat ../final/MOUSE.list | while read id
 do 
-  plotProfile -m ${id%%.*}_matrix.gz \
-    -out ${id%%.*}_profile.png \
+  plotProfile -m ${id}_matrix.gz \
+    -out ${id}_profile.png \
     --perGroup \
     --colors green \
     --plotTitle "" \
     --refPointLabel "TSS" \
-    -T "${id%%.*} read density" \
+    -T "${id} read density" \
     -z ""
 done
 
 # heatmap
-ls *.log | while read id; 
-do
-  plotHeatmap -m ${id%%.*}_matrix.gz \
-  -out ${id%%.*}_heatmap2.png \
+cat ../final/MOUSE.list | while read id
+do 
+  plotHeatmap -m ${id}_matrix.gz \
+  -out ${id}_heatmap.png \
   --colorMap RdBu \
   --whatToShow 'heatmap and colorbar' \
   --zMin -8 --zMax 8  
@@ -860,10 +862,10 @@ done
 
 
 # heatmap and profile plot
-ls *.log | while read id; 
+cat ../final/MOUSE.list | while read id
 do 
-  plotHeatmap -m ${id%%.*}_matrix.gz \
-    -out ${id%%.*}_heatmap.png \
+  plotHeatmap -m ${id}_matrix.gz \
+    -out ${id}_all.png \
     --colorMap RdBu \
     --zMin -12 --zMax 12
 done
@@ -889,6 +891,202 @@ do
 done
 ```
 
+# 9. 寻找rep间consensus peak
+1. 对样本进行整理
+* 见"mouse数据质量情况.xlsx文件"
+```bash
+# Sort peak by -log10(p-value)
+mkdir -p /mnt/xuruizhi/ATAC_brain/mouse/IDR
+cd /mnt/xuruizhi/ATAC_brain/mouse/peaks
+
+parallel -j 6 "
+sort -k8,8nr {1} > ../IDR/{1}.8thsorted
+" ::: $(ls *.narrowPeak)
+
+
+
+cd ../IDR
+
+vim idr.sh
+#!/bin/bash
+# 获取输入参数
+input_files=("$@")  # 从命令行参数获取输入文件列表
+output_dir="${input_files[-1]}"  # 最后一个参数作为输出目录
+unset 'input_files[${#input_files[@]}-1]'  # 移除输出目录参数
+
+# 创建输出目录（如果不存在）
+mkdir -p "$output_dir"
+
+# 函数：运行IDR分析
+run_idr_analysis() {
+    local input1="$1"
+    local input2="$2"
+    local output_name="$3"
+    
+    idr --samples "$input1" "$input2" \
+        --input-file-type narrowPeak \
+        --rank p.value \
+        --soft-idr-threshold 0.05 \
+        --use-best-multisummit-IDR \
+        --output-file "${output_dir}/${output_name}_0.05.txt" \
+        --log-output-file "${output_dir}/${output_name}_0.05.log" \
+        --plot
+    
+    echo "IDR analysis completed for samples: $input1, $input2"
+    echo "Output files: ${output_dir}/${output_name}_0.05.txt, ${output_dir}/${output_name}_0.05.log"
+}
+
+# 运行IDR分析
+for ((i=0; i<${#input_files[@]}; i++)); do
+    for ((j=i+1; j<${#input_files[@]}; j++)); do
+        file1="${input_files[i]}"
+        file2="${input_files[j]}"
+        file1_name=$(basename "$file1" | sed 's/\..*//')  # 提取文件名，去除文件扩展名
+        file2_name=$(basename "$file2" | sed 's/\..*//')  # 提取文件名，去除文件扩展名
+        output_name="idr_${file1_name}_${file2_name}"
+        
+        run_idr_analysis "$file1" "$file2" "$output_name"
+    done
+done
+```
+2. 代码
+① HIPP: SRR11179780 + SRR11179781
+```bash
+
+
+
+
+# 筛选出IDR<0.05，IDR=0.05, int(-125log2(0.05)) = 540，即第五列>=540
+awk '{if($5 >= 540) print $0}' HIPP79-81_0.05.txt > HIPP79-81_IDR0.05.txt
+awk '{if($5 >= 540) print $0}' HIPP80-81_0.05.txt > HIPP80-81_IDR0.05.txt
+awk '{if($5 >= 540) print $0}' HIPP79-80_0.05.txt > HIPP79-80_IDR0.05.txt
+  #  75858 HIPP79-80_0.05.txt
+  #  16814 HIPP79-80_IDR0.05.txt
+  #  62009 HIPP79-81_0.05.txt
+  #  11862 HIPP79-81_IDR0.05.txt
+  #  66547 HIPP80-81_0.05.txt
+  #  14763 HIPP80-81_IDR0.05.txt
+
+# 合并三组peak
+cut -f 1,2,3 HIPP79-80_IDR0.05.txt > HIPP79-80_IDR0.05.bed
+cut -f 1,2,3 HIPP79-81_IDR0.05.txt > HIPP79-81_IDR0.05.bed
+cut -f 1,2,3 HIPP80-81_IDR0.05.txt > HIPP80-81_IDR0.05.bed
+cat HIPP*_IDR0.05.bed | grep -v "chrUn_*" | grep -v "chrY"  > HIPP_pool.bed
+$ wc -l *.bed
+  # 16814 HIPP79-80_IDR0.05.bed
+  # 11862 HIPP79-81_IDR0.05.bed
+  # 14763 HIPP80-81_IDR0.05.bed
+  # 43356 HIPP_pool.bed
+sort -k1,1 -k2,2n HIPP_pool.bed > HIPP_pool_sort.bed
+bedtools merge -i HIPP_pool_sort.bed -d 50 > HIPP_pool_merge.bed
+wc -l  HIPP_pool_merge.bed
+#  21531 HIPP_pool_merge.bed
+```
+
+② cortex
+```bash
+# Sort peak by -log10(p-value)
+cd /mnt/xuruizhi/brain/macs2_peaks_final/mouse
+
+# SRR130..59-61
+cd /mnt/xuruizhi/brain/IDR_final/mouse
+idr --samples SRR13049359_peaks.narrowPeak.8thsorted SRR13049361_peaks.narrowPeak.8thsorted \
+--input-file-type narrowPeak \
+--rank p.value \
+--soft-idr-threshold 0.05 \
+--use-best-multisummit-IDR \
+--output-file cortex59-61_0.05.txt \
+--log-output-file cortex59-61_0.05.log \
+--plot
+
+
+# 筛选出IDR<0.05，IDR=0.05, int(-125log2(0.05)) = 540，即第五列>=540
+awk '{if($5 >= 540) print $0}' cortex59-61_0.05.txt > cortex59-61_IDR0.05.txt 
+$ wc -l cortex*.txt
+  # 143514 cortex59-61_0.05.txt
+  #  45284 cortex59-61_IDR0.05.txt
+
+cut -f 1,2,3 cortex59-61_IDR0.05.txt  > cortex59-61_IDR0.05.bed
+cat cortex59-61_IDR0.05.bed | grep -v "chrUn_*" | grep -v "chrY"  > cortex_pool.bed
+sort -k1,1 -k2,2n cortex_pool.bed > cortex_pool_sort.bed
+bedtools merge -i cortex_pool_sort.bed -d 50 > cortex_pool_merge.bed
+$ wc -l cortex*.bed
+  # 45284 cortex59-61_IDR0.05.bed
+  # 45273 cortex_pool.bed
+  # 45265 cortex_pool_merge.bed
+  # 45273 cortex_pool_sort.bed
+```
+③ PFC
+```bash
+# SRR143..76-81-82
+## PFC:76-81
+cd /mnt/xuruizhi/brain/IDR_final/mouse
+idr --samples SRR14362276_peaks.narrowPeak.8thsorted SRR11179781_peaks.narrowPeak.8thsorted \
+--input-file-type narrowPeak \
+--rank p.value \
+--soft-idr-threshold 0.05 \
+--use-best-multisummit-IDR \
+--output-file PFC76-81_0.05.txt \
+--log-output-file PFC76-81_0.05.log \
+--plot
+
+## PFC:76-82
+cd /mnt/xuruizhi/brain/IDR_final/mouse
+idr --samples SRR14362276_peaks.narrowPeak.8thsorted SRR14362282_peaks.narrowPeak.8thsorted \
+--input-file-type narrowPeak \
+--rank p.value \
+--soft-idr-threshold 0.05 \
+--use-best-multisummit-IDR \
+--output-file PFC76-82_0.05.txt \
+--log-output-file PFC76-82_0.05.log \
+--plot
+
+## PFC:81-82
+cd /mnt/xuruizhi/brain/IDR_final/mouse
+idr --samples SRR14362281_peaks.narrowPeak.8thsorted SRR14362282_peaks.narrowPeak.8thsorted \
+--input-file-type narrowPeak \
+--rank p.value \
+--soft-idr-threshold 0.05 \
+--use-best-multisummit-IDR \
+--output-file PFC81-82_0.05.txt \
+--log-output-file PFC81-82_0.05.log \
+--plot
+
+awk '{if($5 >= 540) print $0}' PFC76-81_0.05.txt > PFC76-81_IDR0.05.txt
+awk '{if($5 >= 540) print $0}' PFC76-82_0.05.txt > PFC76-82_IDR0.05.txt
+awk '{if($5 >= 540) print $0}' PFC81-82_0.05.txt > PFC81-82_IDR0.05.txt
+  #  76804 PFC76-81_0.05.txt
+  #  14501 PFC76-81_IDR0.05.txt
+  # 133102 PFC76-82_0.05.txt
+  #  50196 PFC76-82_IDR0.05.txt
+  # 131879 PFC81-82_0.05.txt
+  #  48522 PFC81-82_IDR0.05.txt
+
+# 合并两peak
+cut -f 1,2,3 PFC76-81_IDR0.05.txt > PFC76-81_IDR0.05.bed
+cut -f 1,2,3 PFC76-82_IDR0.05.txt > PFC76-82_IDR0.05.bed
+cut -f 1,2,3 PFC81-82_IDR0.05.txt > PFC81-82_IDR0.05.bed
+
+cat PFC*_IDR0.05.bed | grep -v "chrUn_*" | grep -v "chrY"  > PFC_pool.bed
+$ wc -l *.bed
+  #  14501 PFC76-81_IDR0.05.bed
+  #  50196 PFC76-82_IDR0.05.bed
+  #  48522 PFC81-82_IDR0.05.bed
+  # 113174 PFC_pool.bed
+sort -k1,1 -k2,2n PFC_pool.bed > PFC_pool_sort.bed
+bedtools merge -i PFC_pool_sort.bed -d 50 > PFC_pool_merge.bed
+wc -l  PFC_pool_merge.bed
+#  58240 PFC_pool_merge.bed
+```
+```bash
+# 统计peak长度
+cat PFC_pool_merge.bed | perl -ne '
+chomp;
+my @info = split( /\t/, $_ );
+my $result = ( $info[2] - $info[1] );
+print "$_\t$result\n";
+' | head
+```
 
 
 
