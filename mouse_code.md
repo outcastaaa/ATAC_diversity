@@ -1009,15 +1009,6 @@ for (file in file_list) {
 #  Max.   :3326.0 
 
 
-# HIPP长度分布情况
-# 画图
-getwd()    #[1] "D:/brain/brain/R_analyse"
-# 以HIPP为例
-a<-read.table('../IDR_final/mouse/HIPP_pool_merge_peak_length.txt')
-dim(a)
-png('hist.png')
-hist(abs(as.numeric(a[,1])),breaks=500,xlab = "Fragment length(bp)",ylab = "Frequency",main = "HIPP peak length")
-
 # 画peak length 直方图
 summary_list <- list()
 file_list <- list.files(path = "./", pattern = "SRR\\d+_peaks_length\\.txt", full.names = TRUE)
@@ -1027,7 +1018,7 @@ for (file in file_list) {
   dim_data <- dim(data)
   summary_list[[file]] <- dim_data
 
-  # 生成直方图并保存为PDF文件
+  # 生成直方图并保存为png文件
   png(paste0(file, "_hist.png"))
 #   pdf(paste0(file, "_hist.pdf"))
   hist(abs(as.numeric(data[, 1])), breaks = 500, xlab = "peak length (bp)", ylab = "Frequency", main = file)
@@ -1339,15 +1330,352 @@ wc -l DG*.bed
 #    8682 DG6_common0.bed
 #   65051 DG_pool.bed
 
-sort -k1,1 -k2,2n DG_pool.bed > DG_pool_sort.bed
-bedtools merge -i DG_pool_sort.bed -d 50 > DG_pool_merge.bed
+sort -k1,1 -k2,2n DG_pool.bed | bedtools merge -i stdin -d 50 > DG_pool_merge.bed 
 wc -l  DG_pool_merge.bed
 #  21918
+```
+⑥ 小脑CERE：SRR13443554
+```bash
+cd /mnt/xuruizhi/ATAC_brain/mouse/IDR 
+cut -f 1,2,3 SRR13443554.narrowPeak > "CERE.bed"
+cat CERE.bed |tsv-summarize -g 1 --count
+cat CERE.bed  |  grep -v "chrUn_*" | grep -v "chrY" | grep -v "chrX_GL456233_random" | grep -v "chr4_GL456216_random" | grep -v "chr4_JH584295_random" | grep -v "chr1_GL456211_random" > CERE_pool.bed
+wc -l CERE*.bed
+#   80903 CERE.bed
+#   80809 CERE_pool.bed
+
+sort -k1,1 -k2,2n CERE_pool.bed | bedtools merge -i stdin -d 50 > CERE_pool_merge.bed 
+wc -l  CERE_pool_merge.bed
+#  80559
+```
+⑦ 嗅球OLF：SRR13443549
+```bash
+cd /mnt/xuruizhi/ATAC_brain/mouse/IDR 
+cut -f 1,2,3 SRR13443549.narrowPeak > "OLF.bed"
+cat OLF.bed |tsv-summarize -g 1 --count
+cat OLF.bed  |  grep -v "chrUn_*" | grep -v "chrY" | grep -v "chrX_GL456233_random" | grep -v "chr4_GL456216_random" | grep -v "chr4_JH584295_random" > OLF_pool.bed
+wc -l OLF*.bed
+#   95584 OLF.bed
+#   95485 OLF_pool.bed
+
+sort -k1,1 -k2,2n OLF_pool.bed | bedtools merge -i stdin -d 50 > OLF_pool_merge.bed 
+wc -l  OLF_pool_merge.bed
+#  95345
+```
+⑧ 感觉运动皮层SEN：SRR13443553
+```bash
+cd /mnt/xuruizhi/ATAC_brain/mouse/IDR 
+cut -f 1,2,3 SRR13443553.narrowPeak > "SEN.bed"
+cat SEN.bed |tsv-summarize -g 1 --count
+cat SEN.bed  |  grep -v "chrUn_*" | grep -v "chrY" | grep -v "chrX_GL456233_random" | grep -v "chr4_GL456216_random" | grep -v "chr4_JH584295_random"  > SEN_pool.bed
+wc -l SEN*.bed
+#  181380 SEN.bed
+#  181279 SEN_pool.bed
+
+sort -k1,1 -k2,2n SEN_pool.bed | bedtools merge -i stdin -d 50 > SEN_pool_merge.bed 
+wc -l  SEN_pool_merge.bed
+#  181048
+```
+3. 长度统计
+```bash
+cd /mnt/xuruizhi/ATAC_brain/mouse/IDR
+for i in *_pool_merge.bed
+do
+  echo $i
+  awk '{print $3- $2}' $i > ${i%%.*}_length.txt
+done
+mkdir -p /mnt/d/ATAC_brain/mouse/IDR
+cp /mnt/xuruizhi/ATAC_brain/mouse/IDR/*_pool_merge_length.txt  /mnt/d/ATAC_brain/mouse/IDR/
+```
+```r
+setwd("D:/ATAC_brain/mouse/")
+file_list <- list.files(path = "./IDR", pattern = ".*_pool_merge_length\\.txt$", full.names = TRUE)
+summary_list <- list()
+for (file in file_list) {
+  data <- read.table(file, header = TRUE)
+  summary_list[[file]] <- summary(data)
+}
+
+for (file in file_list) {
+  cat("Summary for", file, ":\n")
+  print(summary_list[[file]])
+}
+
+# 画直方图
+summary_list <- list()
+file_list <- list.files(path = "./IDR", pattern = ".*_pool_merge_length\\.txt$", full.names = TRUE)
+for (file in file_list) {
+  data <- read.table(file)
+  dim_data <- dim(data)
+  summary_list[[file]] <- dim_data
+
+  png(paste0(file, "_hist.png"))
+  hist(abs(as.numeric(data[, 1])), breaks = 500, xlab = "Fragment length (bp)", ylab = "Frequency", main = file)
+  dev.off()
+}
+for (file in file_list) {
+  cat("Summary for", file, ":\n")
+  print(summary_list[[file]])
+}
+```
+4. 富集分析
+```bash
+mkdir -p /mnt/d/ATAC_brain/mouse/GO
+cp /mnt/xuruizhi/ATAC_brain/mouse/IDR/*_pool_merge.bed  /mnt/d/ATAC_brain/mouse/GO/
+```
+① 以 PFC 为例
+```r
+BiocManager::install("ChIPseeker")
+BiocManager::install("GenomicFeatures")
+BiocManager::install("TxDb.Mmusculus.UCSC.mm10.knownGene", force = TRUE)
+BiocManager::install("org.Mm.eg.db", force = TRUE)
+BiocManager::install("clusterProfiler", force = TRUE)
+BiocManager::install("biomaRt", force = TRUE)
+library(biomaRt)
+library(ChIPseeker)
+library(GenomicFeatures)
+library(TxDb.Mmusculus.UCSC.mm10.knownGene)
+library(org.Mm.eg.db)
+library(clusterProfiler)
+
+getwd()
+# [1] "D:/ATAC_brain/mouse"
+
+PFC_peak <- readPeakFile("D:/ATAC_brain/mouse/GO/PFC_pool_merge.bed",sep ="") 
+
+# peak 在染色体上的分布
+png("PFC_covplot.png")  
+covplot(PFC_peak)  
+
+# peak 在TSS位点附件的分布
+txdb <- TxDb.Mmusculus.UCSC.mm10.knownGene
+  promoter <- getPromoters(TxDb=txdb, upstream=1000, downstream=1000)
+  tagMatrix <- getTagMatrix(PFC_peak, windows=promoter)
+tagHeatmap(tagMatrix, xlim=c(-1000, 1000), color="red")
+plotAvgProf(
+  tagMatrix,
+  xlim=c(-1000, 1000),
+  xlab="Genomic Region (5'->3')",
+  ylab = "Peak Frequency")
+
+# peak 分布的基因结构注释
+PFC_peakAnnolist <- annotatePeak(
+    PFC_peak,
+    tssRegion = c(-1000, 1000),
+    TxDb = txdb,
+    annoDb = "org.Mm.eg.db")
+write.table(
+    as.data.frame(PFC_peakAnnolist),
+    "PFC_allpeak.annotation.tsv",
+    sep="\t",
+    row.names = F,
+    quote = F)   
+plotAnnoPie(PFC_peakAnnolist)
+
+# 名称转化
+PFC_peakAnno <- as.data.frame(PFC_peakAnnolist)
+ensembl_id_transform <- function(ENSEMBL_ID){
+    a = bitr(ENSEMBL_ID, fromType="ENSEMBL", toType=c("SYMBOL","ENTREZID"), OrgDb="org.Mm.eg.db")
+    return(a)
+}
+PFC_ensembl_id_transform <- ensembl_id_transform(PFC_peakAnno$ENSEMBL)
+write.csv(ensembl_id_transform(PFC_peakAnno$ENSEMBL), file="PFC_allpeak_geneID.tsv", quote = F)
+
+# biomart转化
+mart <- useDataset( "mmusculus_gene_ensembl", useMart("ENSEMBL_MART_ENSEMBL"))
+PFC_biomart_ensembl_id_transform <- getBM(attributes=c("ensembl_gene_id","external_gene_name","entrezgene_id", "description"), filters = 'ensembl_gene_id', values = PFC_peakAnno$ENSEMBL, mart = mart) 
+write.csv(PFC_biomart_ensembl_id_transform, file="PFC_allpeak_biomart_geneID.tsv", quote = F)
 
 
+# 富集分析
+PFC_BP <- enrichGO(
+        gene = PFC_biomart_ensembl_id_transform$entrezgene_id, 
+        keyType = "ENTREZID",
+        OrgDb = org.Mm.eg.db, 
+        ont = "BP", 
+        pAdjustMethod = "BH", 
+        qvalueCutoff = 0.05, 
+        readable = TRUE)
+
+barplot(PFC_BP, showCategory=40, font.size = 6, title = paste("The GO BP enrichment analysis", sep = ""))
+pdf(file="GO_BP.pdf")
+barplot(PFC_BP, showCategory=40, font.size = 6, title = paste("The GO BP enrichment analysis", sep = ""))
+dev.off()
+# 大部分与DNA修复，甲基化修饰，蛋白调控相关，没有直接显示和PFC功能相关的，有很多和突触生成相关，与HIPP很相似
+
+# Multiple samples KEGG analysis
+PFC_kegg <- enrichKEGG(gene =
+        PFC_biomart_ensembl_id_transform$entrezgene_id,
+        organism = 'mmu',
+        pvalueCutoff = 0.05,
+        pAdjustMethod = "BH")
+barplot(HIPP_kegg, showCategory = 20, title = "KEGG Pathway Enrichment Analysis")
+# 富集到了很多疾病，如：阿尔兹海默，亨廷顿，帕金森等，与HIPP非常相似
+```
+② 循环
+```r
+
+regions <- c("HIPP", "PFC", "cortex", "DG", "STR", "CERE", "OLF", "SEN")
+
+for (region in regions) {
+  region_peak <- readPeakFile(paste0("D:/ATAC_brain/mouse/GO/", region, "_pool_merge.bed"), sep = "")
+
+  png(paste0(region, "_covplot.png"))
+  covplot(region_peak)
+  dev.off()
+
+  txdb <- TxDb.Mmusculus.UCSC.mm10.knownGene
+  promoter <- getPromoters(TxDb = txdb, upstream = 1000, downstream = 1000)
+  tagMatrix <- getTagMatrix(region_peak, windows = promoter)
+  tagHeatmap(tagMatrix, xlim = c(-1000, 1000), color = "red")
+
+  png(paste0(region, "_avg_prof_plot.png"))
+  plotAvgProf(
+    tagMatrix,
+    xlim = c(-1000, 1000),
+    xlab = "Genomic Region (5'->3')",
+    ylab = "Peak Frequency"
+  )
+  dev.off()
+
+  region_peakAnnolist <- annotatePeak(
+    region_peak,
+    tssRegion = c(-1000, 1000),
+    TxDb = txdb,
+    annoDb = "org.Mm.eg.db"
+  )
+  write.table(
+    as.data.frame(region_peakAnnolist),
+    file = paste0(region, "_allpeak.annotation.tsv"),
+    sep = "\t",
+    row.names = FALSE,
+    quote = FALSE
+  )
+
+  png(paste0(region, "_plotAnnoPie.png"))
+  plotAnnoPie(region_peakAnnolist)
+  dev.off()
+
+  region_peakAnno <- as.data.frame(region_peakAnnolist)
+  ensembl_id_transform <- function(ENSEMBL_ID) {
+    a = bitr(ENSEMBL_ID, fromType = "ENSEMBL", toType = c("SYMBOL", "ENTREZID"), OrgDb = "org.Mm.eg.db")
+    return(a)
+  }
+  region_ensembl_id_transform <- ensembl_id_transform(region_peakAnno$ENSEMBL)
+  write.csv(ensembl_id_transform(region_peakAnno$ENSEMBL), file = paste0(region, "_allpeak_geneID.tsv"), quote = FALSE)
+
+  mart <- useDataset("mmusculus_gene_ensembl", useMart("ENSEMBL_MART_ENSEMBL"))
+  region_biomart_ensembl_id_transform <- getBM(
+    attributes = c("ensembl_gene_id", "external_gene_name", "entrezgene_id", "description"),
+    filters = "ensembl_gene_id",
+    values = region_peakAnno$ENSEMBL,
+    mart = mart
+  )
+  write.csv(region_biomart_ensembl_id_transform, file = paste0(region, "_allpeak_biomart_geneID.tsv"), quote = FALSE)
+}
+```
+
+```r
+regions <- c("HIPP", "PFC", "cortex", "DG", "STR", "CERE", "OLF", "SEN")
+
+for (region in regions) {
+  region_peak <- readPeakFile(paste0("D:/ATAC_brain/mouse/GO/", region, "_pool_merge.bed"), sep = "")
+
+  png(paste0(region, "_covplot.png"))
+  covplot(region_peak)
+  dev.off()
+
+  txdb <- TxDb.Mmusculus.UCSC.mm10.knownGene
+  promoter <- getPromoters(TxDb = txdb, upstream = 1000, downstream = 1000)
+  tagMatrix <- getTagMatrix(region_peak, windows = promoter)
+  png(paste0(region, "_promoter.png"))
+  tagHeatmap(tagMatrix, xlim = c(-1000, 1000), color = "red")
+  dev.off()
+
+  png(paste0(region, "_avg_prof_plot.png"))
+  plotAvgProf(
+    tagMatrix,
+    xlim = c(-1000, 1000),
+    xlab = "Genomic Region (5'->3')",
+    ylab = "Peak Frequency"
+  )
+  dev.off()
+
+  region_peakAnnolist <- annotatePeak(
+    region_peak,
+    tssRegion = c(-1000, 1000),
+    TxDb = txdb,
+    annoDb = "org.Mm.eg.db"
+  )
+  write.table(
+    as.data.frame(region_peakAnnolist),
+    file = paste0(region, "_allpeak.annotation.tsv"),
+    sep = "\t",
+    row.names = FALSE,
+    quote = FALSE
+  )
+
+  png(paste0(region, "_plotAnnoPie.png"))
+  plotAnnoPie(region_peakAnnolist)
+  dev.off()
+
+  region_peakAnno <- as.data.frame(region_peakAnnolist)
+  ensembl_id_transform <- function(ENSEMBL_ID) {
+    a = bitr(ENSEMBL_ID, fromType = "ENSEMBL", toType = c("SYMBOL", "ENTREZID"), OrgDb = "org.Mm.eg.db")
+    return(a)
+  }
+  region_ensembl_id_transform <- ensembl_id_transform(region_peakAnno$ENSEMBL)
+  write.csv(ensembl_id_transform(region_peakAnno$ENSEMBL), file = paste0(region, "_allpeak_geneID.tsv"), quote = FALSE)
+
+  mart <- useDataset("mmusculus_gene_ensembl", useMart("ENSEMBL_MART_ENSEMBL"))
+  region_biomart_ensembl_id_transform <- getBM(
+    attributes = c("ensembl_gene_id", "external_gene_name", "entrezgene_id", "description"),
+    filters = "ensembl_gene_id",
+    values = region_peakAnno$ENSEMBL,
+    mart = mart
+  )
+  write.csv(region_biomart_ensembl_id_transform, file = paste0(region, "_allpeak_biomart_geneID.tsv"), quote = FALSE)
+
+  # GO analysis and barplot
+  region_biomart <- enrichGO(
+    gene = region_biomart_ensembl_id_transform$entrezgene_id, 
+    keyType = "ENTREZID",
+    OrgDb = org.Mm.eg.db,
+    ont = "BP",
+    pAdjustMethod = "BH",
+    qvalueCutoff = 0.05,
+    readable = TRUE
+  )
+  pdf(file = paste0(region, "_biomart.pdf"))
+  barplot(region_biomart, showCategory = 40, font.size = 6, title = paste("The GO BP enrichment analysis", sep = ""))
+  dev.off()
 
 
+  region_transform <- enrichGO(
+    gene = region_ensembl_id_transform$entrezgene_id, 
+    keyType = "ENTREZID",
+    OrgDb = org.Mm.eg.db,
+    ont = "BP",
+    pAdjustMethod = "BH",
+    qvalueCutoff = 0.05,
+    readable = TRUE
+  )
+  pdf(file = paste0(region, "_transform.pdf"))
+  barplot(region_transform, showCategory = 40, font.size = 6, title = paste("The GO BP enrichment analysis", sep = ""))
+  dev.off()
 
+
+  region_kegg <- enrichKEGG(
+    gene = region_ensembl_id_transform$entrezgene_id,
+    organism = 'mmu',
+    pvalueCutoff = 0.05,
+    pAdjustMethod = "BH"
+  )
+  pdf(file = paste0(region, "_kegg.pdf"))
+  barplot(region_kegg, showCategory = 20, title = "KEGG Pathway Enrichment Analysis")
+  dev.off()
+}
+```
 
 
 
