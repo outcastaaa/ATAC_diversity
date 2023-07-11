@@ -1648,42 +1648,42 @@ for (region in regions) {
   )
   write.csv(region_biomart_ensembl_id_transform, file = paste0(region, "_allpeak_biomart_geneID.tsv"), quote = FALSE)
 
-  # GO analysis and barplot
-  region_biomart <- enrichGO(
-    gene = region_biomart_ensembl_id_transform$entrezgene_id, 
-    keyType = "ENTREZID",
-    OrgDb = org.Mm.eg.db,
-    ont = "BP",
-    pAdjustMethod = "BH",
-    qvalueCutoff = 0.05,
-    readable = TRUE
-  )
-  pdf(file = paste0(region, "_biomart.pdf"))
-  barplot(region_biomart, showCategory = 40, font.size = 6, title = paste("The GO BP enrichment analysis", sep = ""))
-  dev.off()
+  # # GO analysis and barplot
+  # region_biomart <- enrichGO(
+  #   gene = region_biomart_ensembl_id_transform$entrezgene_id, 
+  #   keyType = "ENTREZID",
+  #   OrgDb = org.Mm.eg.db,
+  #   ont = "BP",
+  #   pAdjustMethod = "BH",
+  #   qvalueCutoff = 0.05,
+  #   readable = TRUE
+  # )
+  # pdf(file = paste0(region, "_biomart.pdf"))
+  # barplot(region_biomart, showCategory = 40, font.size = 6, title = paste("The GO BP enrichment analysis", sep = ""))
+  # dev.off()
 
-  region_transform <- enrichGO(
-    gene = region_ensembl_id_transform$ENTREZID, 
-    keyType = "ENTREZID",
-    OrgDb = org.Mm.eg.db,
-    ont = "BP",
-    pAdjustMethod = "BH",
-    qvalueCutoff = 0.05,
-    readable = TRUE
-  )
-  pdf(file = paste0(region, "_transform.pdf"))
-  barplot(region_transform, showCategory = 40, font.size = 6, title = paste("The GO BP enrichment analysis", sep = ""))
-  dev.off()
+  # region_transform <- enrichGO(
+  #   gene = region_ensembl_id_transform$ENTREZID, 
+  #   keyType = "ENTREZID",
+  #   OrgDb = org.Mm.eg.db,
+  #   ont = "BP",
+  #   pAdjustMethod = "BH",
+  #   qvalueCutoff = 0.05,
+  #   readable = TRUE
+  # )
+  # pdf(file = paste0(region, "_transform.pdf"))
+  # barplot(region_transform, showCategory = 40, font.size = 6, title = paste("The GO BP enrichment analysis", sep = ""))
+  # dev.off()
 
-  region_kegg <- enrichKEGG(
-    gene = region_ensembl_id_transform$ENTREZID,
-    organism = 'mmu',
-    pvalueCutoff = 0.05,
-    pAdjustMethod = "BH"
-  )
-  pdf(file = paste0(region, "_kegg.pdf"))
-  barplot(region_kegg, showCategory = 20, title = "KEGG Pathway Enrichment Analysis")
-  dev.off()
+  # region_kegg <- enrichKEGG(
+  #   gene = region_ensembl_id_transform$ENTREZID,
+  #   organism = 'mmu',
+  #   pvalueCutoff = 0.05,
+  #   pAdjustMethod = "BH"
+  # )
+  # pdf(file = paste0(region, "_kegg.pdf"))
+  # barplot(region_kegg, showCategory = 20, title = "KEGG Pathway Enrichment Analysis")
+  # dev.off()
 }
 ```
 
