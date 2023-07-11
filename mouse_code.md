@@ -785,12 +785,86 @@ cat MOUSE.list | parallel -k -j 6 "
 "
 ```
 
-3. 长度统计
-
+3. 统计平均长度与长度分布情况
+* bash统计平均值
 ```bash
-cat $i | awk '{print $3-$2}' | awk '{sum += $1} END {print avg = sum/NR}'
-```
+mkdir -p /mnt/xuruizhi/ATAC_brain/mouse/length
+cd /mnt/xuruizhi/ATAC_brain/mouse/peaks
 
+for i in *_peaks.narrowPeak
+do
+  echo $i
+  cat $i | awk '{print $3-$2}' | awk '{sum += $1} END {print avg = sum/NR}'
+done
+# SRR11179780_peaks.narrowPeak
+# 470.198
+# SRR11179781_peaks.narrowPeak
+# 392.47
+# SRR13049359_peaks.narrowPeak
+# 363.649
+# SRR13049362_peaks.narrowPeak
+# 425.259
+# SRR13049363_peaks.narrowPeak
+# 411.096
+# SRR13049364_peaks.narrowPeak
+# 391.281
+# SRR13443549_peaks.narrowPeak
+# 454.323
+# SRR13443553_peaks.narrowPeak
+# 427.244
+# SRR13443554_peaks.narrowPeak
+# 480.342
+# SRR14362271_peaks.narrowPeak
+# 412.807
+# SRR14362272_peaks.narrowPeak
+# 462.077
+# SRR14362275_peaks.narrowPeak
+# 457.008
+# SRR14362276_peaks.narrowPeak
+# 453.776
+# SRR14362281_peaks.narrowPeak
+# 480.939
+# SRR14362282_peaks.narrowPeak
+# 439.371
+# SRR3595211_peaks.narrowPeak
+# 339.392
+# SRR3595212_peaks.narrowPeak
+# 380.324
+# SRR3595213_peaks.narrowPeak
+# 286.26
+# SRR3595214_peaks.narrowPeak
+# 288.26
+```
+* R中统计与画图
+！ 将R储存在 D:/ATAC_brain文件夹中
+```r
+
+> summary(a)
+       V1       
+ Min.   :  167  
+ 1st Qu.:  696  
+ Median :  995  
+ Mean   : 1110  
+ 3rd Qu.: 1384  
+ Max.   :11927
+
+```
+```r
+# HIPP长度分布情况
+# 画图
+getwd()    #[1] "D:/brain/brain/R_analyse"
+# 以HIPP为例
+a<-read.table('../IDR_final/mouse/HIPP_pool_merge_peak_length.txt')
+dim(a)
+png('hist.png')
+hist(abs(as.numeric(a[,1])),breaks=500,xlab = "Fragment length(bp)",ylab = "Frequency",main = "HIPP peak length")
+
+# 其他样本类似
+b <-read.table('../IDR_final/mouse/PFC_pool_merge_peak_length.txt')
+hist(abs(as.numeric(b[,1])),breaks=500,xlab = "Fragment length(bp)",ylab = "Frequency",main = "PFC peak length")
+c <-read.table('../IDR_final/mouse/cortex_pool_merge_peak_length.txt')
+hist(abs(as.numeric(c[,1])),breaks=500,xlab = "Fragment length(bp)",ylab = "Frequency",main = "cortex peak length")
+```
 4. TSS enrichment在下一节展示，很重要的判断质量的标准
 
 # 8. Visualization    
@@ -898,12 +972,9 @@ done
 # Sort peak by -log10(p-value)
 mkdir -p /mnt/xuruizhi/ATAC_brain/mouse/IDR
 cd /mnt/xuruizhi/ATAC_brain/mouse/peaks
-
-parallel -j 6 "
-sort -k8,8nr {1} > ../IDR/{1}.8thsorted
-" ::: $(ls *.narrowPeak)
-
-
+cat ../final/MOUSE.list | parallel -j 6 -k "
+sort -k8,8nr {}_peaks.narrowPeak > ../IDR/{}.narrowPeak 
+"
 
 cd ../IDR
 
@@ -943,7 +1014,7 @@ for ((i=0; i<${#input_files[@]}; i++)); do
         file2="${input_files[j]}"
         file1_name=$(basename "$file1" | sed 's/\..*//')  # 提取文件名，去除文件扩展名
         file2_name=$(basename "$file2" | sed 's/\..*//')  # 提取文件名，去除文件扩展名
-        output_name="idr_${file1_name}_${file2_name}"
+        output_name="${file1_name}_${file2_name}"
         
         run_idr_analysis "$file1" "$file2" "$output_name"
     done
@@ -952,141 +1023,175 @@ done
 2. 代码
 ① HIPP: SRR11179780 + SRR11179781
 ```bash
+cd /mnt/xuruizhi/ATAC_brain/mouse/IDR
+chmod +x idr.sh 
+./idr.sh SRR11179780.narrowPeak SRR11179781.narrowPeak .
+mv SRR11179780_SRR11179781.txt HIPP.txt # 66547
 
-
-
-
-# 筛选出IDR<0.05，IDR=0.05, int(-125log2(0.05)) = 540，即第五列>=540
-awk '{if($5 >= 540) print $0}' HIPP79-81_0.05.txt > HIPP79-81_IDR0.05.txt
-awk '{if($5 >= 540) print $0}' HIPP80-81_0.05.txt > HIPP80-81_IDR0.05.txt
-awk '{if($5 >= 540) print $0}' HIPP79-80_0.05.txt > HIPP79-80_IDR0.05.txt
-  #  75858 HIPP79-80_0.05.txt
-  #  16814 HIPP79-80_IDR0.05.txt
-  #  62009 HIPP79-81_0.05.txt
-  #  11862 HIPP79-81_IDR0.05.txt
-  #  66547 HIPP80-81_0.05.txt
-  #  14763 HIPP80-81_IDR0.05.txt
-
-# 合并三组peak
-cut -f 1,2,3 HIPP79-80_IDR0.05.txt > HIPP79-80_IDR0.05.bed
-cut -f 1,2,3 HIPP79-81_IDR0.05.txt > HIPP79-81_IDR0.05.bed
-cut -f 1,2,3 HIPP80-81_IDR0.05.txt > HIPP80-81_IDR0.05.bed
-cat HIPP*_IDR0.05.bed | grep -v "chrUn_*" | grep -v "chrY"  > HIPP_pool.bed
-$ wc -l *.bed
-  # 16814 HIPP79-80_IDR0.05.bed
-  # 11862 HIPP79-81_IDR0.05.bed
-  # 14763 HIPP80-81_IDR0.05.bed
-  # 43356 HIPP_pool.bed
+awk '{if($5 >= 540) print $0}' HIPP.txt > HIPP_common0.05.txt
+cut -f 1,2,3 HIPP_common0.05.txt > HIPP_common0.05.bed
+cat HIPP_common0.05.bed | tsv-summarize -g 1 --count
+cat HIPP_common0.05.bed | grep -v "chrUn_*" | grep -v "chrY" | grep -v "chrX_GL456233_random" | grep -v "chr4_GL456216_random" > HIPP_pool.bed
+wc -l *.bed
+#  14761 HIPP_common0.05.bed
+#  14723 HIPP_pool.bed
 sort -k1,1 -k2,2n HIPP_pool.bed > HIPP_pool_sort.bed
 bedtools merge -i HIPP_pool_sort.bed -d 50 > HIPP_pool_merge.bed
 wc -l  HIPP_pool_merge.bed
-#  21531 HIPP_pool_merge.bed
+#  14720 HIPP_pool_merge.bed
 ```
 
-② cortex
+② cortex: SRR13049359 + SRR13049362
 ```bash
-# Sort peak by -log10(p-value)
-cd /mnt/xuruizhi/brain/macs2_peaks_final/mouse
+cd /mnt/xuruizhi/ATAC_brain/mouse/IDR 
+./idr.sh SRR13049359.narrowPeak SRR13049362.narrowPeak .
+mv SRR13049359_SRR13049362.txt cortex.txt 
+# 140856
 
-# SRR130..59-61
-cd /mnt/xuruizhi/brain/IDR_final/mouse
-idr --samples SRR13049359_peaks.narrowPeak.8thsorted SRR13049361_peaks.narrowPeak.8thsorted \
---input-file-type narrowPeak \
---rank p.value \
---soft-idr-threshold 0.05 \
---use-best-multisummit-IDR \
---output-file cortex59-61_0.05.txt \
---log-output-file cortex59-61_0.05.log \
---plot
-
-
-# 筛选出IDR<0.05，IDR=0.05, int(-125log2(0.05)) = 540，即第五列>=540
-awk '{if($5 >= 540) print $0}' cortex59-61_0.05.txt > cortex59-61_IDR0.05.txt 
-$ wc -l cortex*.txt
-  # 143514 cortex59-61_0.05.txt
-  #  45284 cortex59-61_IDR0.05.txt
-
-cut -f 1,2,3 cortex59-61_IDR0.05.txt  > cortex59-61_IDR0.05.bed
-cat cortex59-61_IDR0.05.bed | grep -v "chrUn_*" | grep -v "chrY"  > cortex_pool.bed
+awk '{if($5 >= 540) print $0}' cortex.txt > cortex_common0.05.txt
+cut -f 1,2,3 cortex_common0.05.txt > cortex_common0.05.bed
+cat cortex_common0.05.bed | tsv-summarize -g 1 --count
+cat cortex_common0.05.bed | grep -v "chrUn_*" | grep -v "chrY" | grep -v "chrX_GL456233_random" | grep -v "chr4_GL456216_random" | grep -v "chr4_JH584295_random" > cortex_pool.bed
+wc -l cortex*.bed
+#   41485 cortex_common0.05.bed
+#   41470 cortex_pool.bed
 sort -k1,1 -k2,2n cortex_pool.bed > cortex_pool_sort.bed
 bedtools merge -i cortex_pool_sort.bed -d 50 > cortex_pool_merge.bed
-$ wc -l cortex*.bed
-  # 45284 cortex59-61_IDR0.05.bed
-  # 45273 cortex_pool.bed
-  # 45265 cortex_pool_merge.bed
-  # 45273 cortex_pool_sort.bed
+wc -l  cortex_pool_merge.bed
+#  41455 
 ```
-③ PFC
+③ STR: SRR13049363 + SRR13049364
 ```bash
-# SRR143..76-81-82
-## PFC:76-81
-cd /mnt/xuruizhi/brain/IDR_final/mouse
-idr --samples SRR14362276_peaks.narrowPeak.8thsorted SRR11179781_peaks.narrowPeak.8thsorted \
---input-file-type narrowPeak \
---rank p.value \
---soft-idr-threshold 0.05 \
---use-best-multisummit-IDR \
---output-file PFC76-81_0.05.txt \
---log-output-file PFC76-81_0.05.log \
---plot
+cd /mnt/xuruizhi/ATAC_brain/mouse/IDR 
+./idr.sh SRR13049363.narrowPeak SRR13049364.narrowPeak .
+mv SRR13049363_SRR13049364.txt STR.txt 
+# 128132
 
-## PFC:76-82
-cd /mnt/xuruizhi/brain/IDR_final/mouse
-idr --samples SRR14362276_peaks.narrowPeak.8thsorted SRR14362282_peaks.narrowPeak.8thsorted \
---input-file-type narrowPeak \
---rank p.value \
---soft-idr-threshold 0.05 \
---use-best-multisummit-IDR \
---output-file PFC76-82_0.05.txt \
---log-output-file PFC76-82_0.05.log \
---plot
+awk '{if($5 >= 540) print $0}' STR.txt > STR_common0.05.txt
+cut -f 1,2,3 STR_common0.05.txt > STR_common0.05.bed
+cat STR_common0.05.bed | tsv-summarize -g 1 --count
+cat STR_common0.05.bed | grep -v "chrUn_*" | grep -v "chrY" | grep -v "chrX_GL456233_random" | grep -v "chr4_GL456216_random" | grep -v "chr4_JH584295_random" > STR_pool.bed
+wc -l STR*.bed
+#   53187 STR_common0.05.bed
+#   53166 STR_pool.bed
+sort -k1,1 -k2,2n STR_pool.bed > STR_pool_sort.bed
+bedtools merge -i STR_pool_sort.bed -d 50 > STR_pool_merge.bed
+wc -l  STR_pool_merge.bed
+#  53130 
+```
+④ PFC：SRR14362271 + SRR14362272 + SRR14362275 + SRR14362276 + SRR14362281 + SRR14362282
 
-## PFC:81-82
-cd /mnt/xuruizhi/brain/IDR_final/mouse
-idr --samples SRR14362281_peaks.narrowPeak.8thsorted SRR14362282_peaks.narrowPeak.8thsorted \
---input-file-type narrowPeak \
---rank p.value \
---soft-idr-threshold 0.05 \
---use-best-multisummit-IDR \
---output-file PFC81-82_0.05.txt \
---log-output-file PFC81-82_0.05.log \
---plot
+```bash
+cd /mnt/xuruizhi/ATAC_brain/mouse/IDR 
+./idr.sh SRR14362271.narrowPeak SRR14362272.narrowPeak SRR14362275.narrowPeak SRR14362276.narrowPeak SRR14362281.narrowPeak SRR14362282.narrowPeak .
+mv SRR14362271_SRR14362272.txt PFC1.txt 
+mv SRR14362271_SRR14362275.txt PFC2.txt
+mv SRR14362271_SRR14362276.txt PFC3.txt 
+mv SRR14362271_SRR14362281.txt PFC4.txt
+mv SRR14362271_SRR14362282.txt PFC5.txt 
+mv SRR14362272_SRR14362275.txt PFC6.txt
+mv SRR14362272_SRR14362276.txt PFC7.txt 
+mv SRR14362272_SRR14362281.txt PFC8.txt
+mv SRR14362272_SRR14362282.txt PFC9.txt 
+mv SRR14362275_SRR14362276.txt PFC10.txt
+mv SRR14362275_SRR14362281.txt PFC11.txt 
+mv SRR14362275_SRR14362282.txt PFC12.txt
+mv SRR14362276_SRR14362281.txt PFC13.txt 
+mv SRR14362276_SRR14362282.txt PFC14.txt
+mv SRR14362281_SRR14362282.txt PFC15.txt 
 
-awk '{if($5 >= 540) print $0}' PFC76-81_0.05.txt > PFC76-81_IDR0.05.txt
-awk '{if($5 >= 540) print $0}' PFC76-82_0.05.txt > PFC76-82_IDR0.05.txt
-awk '{if($5 >= 540) print $0}' PFC81-82_0.05.txt > PFC81-82_IDR0.05.txt
-  #  76804 PFC76-81_0.05.txt
-  #  14501 PFC76-81_IDR0.05.txt
-  # 133102 PFC76-82_0.05.txt
-  #  50196 PFC76-82_IDR0.05.txt
-  # 131879 PFC81-82_0.05.txt
-  #  48522 PFC81-82_IDR0.05.txt
 
-# 合并两peak
-cut -f 1,2,3 PFC76-81_IDR0.05.txt > PFC76-81_IDR0.05.bed
-cut -f 1,2,3 PFC76-82_IDR0.05.txt > PFC76-82_IDR0.05.bed
-cut -f 1,2,3 PFC81-82_IDR0.05.txt > PFC81-82_IDR0.05.bed
+for i in PFC*.txt; do
+    awk '{if($5 >= 540) print $0}' "$i" > "${i%%.*}_common0.05.txt"
+done
 
-cat PFC*_IDR0.05.bed | grep -v "chrUn_*" | grep -v "chrY"  > PFC_pool.bed
-$ wc -l *.bed
-  #  14501 PFC76-81_IDR0.05.bed
-  #  50196 PFC76-82_IDR0.05.bed
-  #  48522 PFC81-82_IDR0.05.bed
-  # 113174 PFC_pool.bed
+for i in PFC*_common0.05.txt; do
+  cut -f 1,2,3 "$i" > "${i%%.*}.bed"
+done
+cat PFC*_common0.bed | tsv-summarize -g 1 --count
+cat PFC*_common0.bed | grep -v "chrUn_*" | grep -v "chrY" | grep -v "chrX_GL456233_random" | grep -v "chr4_GL456216_random" | grep -v "chr4_JH584295_random" > PFC_pool.bed
+wc -l PFC*.bed
+#    54800 PFC10_common0.bed
+#    56601 PFC11_common0.bed
+#    48761 PFC12_common0.bed
+#    59358 PFC13_common0.bed
+#    50197 PFC14_common0.bed
+#    48530 PFC15_common0.bed
+#    54767 PFC1_common0.bed
+#    51428 PFC2_common0.bed
+#    50577 PFC3_common0.bed
+#    50965 PFC4_common0.bed
+#    45747 PFC5_common0.bed
+#    60667 PFC6_common0.bed
+#    64515 PFC7_common0.bed
+#    66529 PFC8_common0.bed
+#    53607 PFC9_common0.bed
+#   816562 PFC_pool.bed
+
 sort -k1,1 -k2,2n PFC_pool.bed > PFC_pool_sort.bed
 bedtools merge -i PFC_pool_sort.bed -d 50 > PFC_pool_merge.bed
 wc -l  PFC_pool_merge.bed
-#  58240 PFC_pool_merge.bed
+#  91720 
 ```
+
+⑤ DG：SRR3595211 + SRR3595212 + SRR3595213 + SRR3595214
+
 ```bash
-# 统计peak长度
-cat PFC_pool_merge.bed | perl -ne '
-chomp;
-my @info = split( /\t/, $_ );
-my $result = ( $info[2] - $info[1] );
-print "$_\t$result\n";
-' | head
-```
+cd /mnt/xuruizhi/ATAC_brain/mouse/IDR 
+./idr.sh SRR3595211.narrowPeak SRR3595212.narrowPeak SRR3595213.narrowPeak SRR3595214.narrowPeak .
+mv SRR3595211_SRR3595212.txt DG1.txt 
+mv SRR3595211_SRR3595213.txt DG2.txt
+mv SRR3595211_SRR3595214.txt DG3.txt 
+mv SRR3595212_SRR3595213.txt DG4.txt
+mv SRR3595212_SRR3595214.txt DG5.txt 
+mv SRR3595213_SRR3595214.txt DG6.txt
+
+
+for i in DG*.txt; do
+    awk '{if($5 >= 540) print $0}' "$i" > "${i%%.*}_common0.05.txt"
+done
+
+for i in DG*_common0.05.txt; do
+  cut -f 1,2,3 "$i" > "${i%%.*}.bed"
+done
+cat DG*_common0.bed | tsv-summarize -g 1 --count
+cat DG*_common0.bed | grep -v "chrUn_*" | grep -v "chrY" | grep -v "chrX_GL456233_random" | grep -v "chr4_GL456216_random"  > DG_pool.bed
+wc -l DG*.bed
+#   17444 DG1_common0.bed
+#    8474 DG2_common0.bed
+#   10532 DG3_common0.bed
+#    8766 DG4_common0.bed
+#   11193 DG5_common0.bed
+#    8682 DG6_common0.bed
+#   65051 DG_pool.bed
+
+sort -k1,1 -k2,2n DG_pool.bed > DG_pool_sort.bed
+bedtools merge -i DG_pool_sort.bed -d 50 > DG_pool_merge.bed
+wc -l  DG_pool_merge.bed
+#  21918
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

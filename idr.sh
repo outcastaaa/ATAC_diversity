@@ -19,12 +19,12 @@ run_idr_analysis() {
         --rank p.value \
         --soft-idr-threshold 0.05 \
         --use-best-multisummit-IDR \
-        --output-file "${output_dir}/${output_name}_0.05.txt" \
-        --log-output-file "${output_dir}/${output_name}_0.05.log" \
+        --output-file "${output_dir}/${output_name}.txt" \
+        --log-output-file "${output_dir}/${output_name}.log" \
         --plot
     
     echo "IDR analysis completed for samples: $input1, $input2"
-    echo "Output files: ${output_dir}/${output_name}_0.05.txt, ${output_dir}/${output_name}_0.05.log"
+    echo "Output files: ${output_dir}/${output_name}.txt, ${output_dir}/${output_name}.log"
 }
 
 # 运行IDR分析
