@@ -795,6 +795,7 @@ for i in *_peaks.narrowPeak
 do
   echo $i
   cat $i | awk '{print $3-$2}' | awk '{sum += $1} END {print avg = sum/NR}'
+  awk '{print $3- $2}' $i > ${i%%.*}_length.txt
 done
 # SRR11179780_peaks.narrowPeak
 # 470.198
@@ -834,22 +835,180 @@ done
 # 286.26
 # SRR3595214_peaks.narrowPeak
 # 288.26
+
+mkdir -p /mnt/d/ATAC_brain/peaks/
+cp /mnt/xuruizhi/ATAC_brain/mouse/peaks/* /mnt/d/ATAC_brain/peaks/
 ```
 * R中统计与画图
 ！ 将R储存在 D:/ATAC_brain文件夹中
 ```r
+setwd("D:/ATAC_brain/peaks")
+file_list <- list.files(pattern = "SRR\\d+_peaks_length\\.txt")
+summary_list <- list()
+for (file in file_list) {
+  data <- read.table(file, header = TRUE)
+  summary_list[[file]] <- summary(data)
+}
 
-> summary(a)
-       V1       
- Min.   :  167  
- 1st Qu.:  696  
- Median :  995  
- Mean   : 1110  
- 3rd Qu.: 1384  
- Max.   :11927
+for (file in file_list) {
+  cat("Summary for", file, ":\n")
+  print(summary_list[[file]])
+}
 
-```
-```r
+# Summary for SRR11179780_peaks_length.txt :
+#       X426       
+#  Min.   : 150.0  
+#  1st Qu.: 211.0  
+#  Median : 320.0  
+#  Mean   : 470.2  
+#  3rd Qu.: 548.0  
+#  Max.   :8156.0  
+# Summary for SRR11179781_peaks_length.txt :
+#       X188       
+#  Min.   : 150.0  
+#  1st Qu.: 192.0  
+#  Median : 284.0  
+#  Mean   : 392.5  
+#  3rd Qu.: 465.0  
+#  Max.   :5445.0  
+# Summary for SRR13049359_peaks_length.txt :
+#       X446       
+#  Min.   : 150.0  
+#  1st Qu.: 189.0  
+#  Median : 272.0  
+#  Mean   : 363.6  
+#  3rd Qu.: 432.0  
+#  Max.   :4200.0  
+# Summary for SRR13049362_peaks_length.txt :
+#       X207       
+#  Min.   : 150.0  
+#  1st Qu.: 211.0  
+#  Median : 315.0  
+#  Mean   : 425.3  
+#  3rd Qu.: 520.0  
+#  Max.   :6332.0  
+# Summary for SRR13049363_peaks_length.txt :
+#       X385       
+#  Min.   : 150.0  
+#  1st Qu.: 201.0  
+#  Median : 294.0  
+#  Mean   : 411.1  
+#  3rd Qu.: 489.0  
+#  Max.   :7771.0  
+# Summary for SRR13049364_peaks_length.txt :
+#       X553       
+#  Min.   : 150.0  
+#  1st Qu.: 195.0  
+#  Median : 283.0  
+#  Mean   : 391.3  
+#  3rd Qu.: 464.0  
+#  Max.   :5302.0  
+# Summary for SRR13443549_peaks_length.txt :
+#       X353       
+#  Min.   : 150.0  
+#  1st Qu.: 201.0  
+#  Median : 298.0  
+#  Mean   : 454.3  
+#  3rd Qu.: 530.0  
+#  Max.   :6082.0  
+# Summary for SRR13443553_peaks_length.txt :
+#       X462       
+#  Min.   : 150.0  
+#  1st Qu.: 202.0  
+#  Median : 296.0  
+#  Mean   : 427.2  
+#  3rd Qu.: 497.0  
+#  Max.   :6442.0  
+# Summary for SRR13443554_peaks_length.txt :
+#       X174       
+#  Min.   : 150.0  
+#  1st Qu.: 196.0  
+#  Median : 301.0  
+#  Mean   : 480.3  
+#  3rd Qu.: 590.0  
+#  Max.   :6096.0  
+# Summary for SRR14362271_peaks_length.txt :
+#       X469       
+#  Min.   : 150.0  
+#  1st Qu.: 199.0  
+#  Median : 296.0  
+#  Mean   : 412.8  
+#  3rd Qu.: 481.0  
+#  Max.   :6495.0  
+# Summary for SRR14362272_peaks_length.txt :
+#       X159        
+#  Min.   :  150.0  
+#  1st Qu.:  215.0  
+#  Median :  323.0  
+#  Mean   :  462.1  
+#  3rd Qu.:  537.0  
+#  Max.   :10124.0  
+# Summary for SRR14362275_peaks_length.txt :
+#       X523     
+#  Min.   : 150  
+#  1st Qu.: 212  
+#  Median : 318  
+#  Mean   : 457  
+#  3rd Qu.: 531  
+#  Max.   :7780  
+# Summary for SRR14362276_peaks_length.txt :
+#       X437       
+#  Min.   : 150.0  
+#  1st Qu.: 210.0  
+#  Median : 316.0  
+#  Mean   : 453.8  
+#  3rd Qu.: 527.0  
+#  Max.   :7626.0  
+# Summary for SRR14362281_peaks_length.txt :
+#       X702        
+#  Min.   :  150.0  
+#  1st Qu.:  220.0  
+#  Median :  334.0  
+#  Mean   :  480.9  
+#  3rd Qu.:  565.0  
+#  Max.   :10318.0  
+# Summary for SRR14362282_peaks_length.txt :
+#       X466       
+#  Min.   : 150.0  
+#  1st Qu.: 208.0  
+#  Median : 310.0  
+#  Mean   : 439.4  
+#  3rd Qu.: 511.0  
+#  Max.   :6658.0  
+# Summary for SRR3595211_peaks_length.txt :
+#       X164       
+#  Min.   : 150.0  
+#  1st Qu.: 170.0  
+#  Median : 237.0  
+#  Mean   : 339.4  
+#  3rd Qu.: 375.0  
+#  Max.   :4283.0  
+# Summary for SRR3595212_peaks_length.txt :
+#       X226       
+#  Min.   : 150.0  
+#  1st Qu.: 182.0  
+#  Median : 256.0  
+#  Mean   : 380.3  
+#  3rd Qu.: 426.0  
+#  Max.   :6523.0  
+# Summary for SRR3595213_peaks_length.txt :
+#       X153       
+#  Min.   : 150.0  
+#  1st Qu.: 160.0  
+#  Median : 217.0  
+#  Mean   : 286.3  
+#  3rd Qu.: 326.0  
+#  Max.   :3172.0  
+# Summary for SRR3595214_peaks_length.txt :
+#       X197       
+#  Min.   : 150.0  
+#  1st Qu.: 159.0  
+#  Median : 213.0  
+#  Mean   : 288.3  
+#  3rd Qu.: 322.0  
+#  Max.   :3326.0 
+
+
 # HIPP长度分布情况
 # 画图
 getwd()    #[1] "D:/brain/brain/R_analyse"
@@ -859,11 +1018,26 @@ dim(a)
 png('hist.png')
 hist(abs(as.numeric(a[,1])),breaks=500,xlab = "Fragment length(bp)",ylab = "Frequency",main = "HIPP peak length")
 
-# 其他样本类似
-b <-read.table('../IDR_final/mouse/PFC_pool_merge_peak_length.txt')
-hist(abs(as.numeric(b[,1])),breaks=500,xlab = "Fragment length(bp)",ylab = "Frequency",main = "PFC peak length")
-c <-read.table('../IDR_final/mouse/cortex_pool_merge_peak_length.txt')
-hist(abs(as.numeric(c[,1])),breaks=500,xlab = "Fragment length(bp)",ylab = "Frequency",main = "cortex peak length")
+# 画peak length 直方图
+summary_list <- list()
+file_list <- list.files(path = "./", pattern = "SRR\\d+_peaks_length\\.txt", full.names = TRUE)
+
+for (file in file_list) {
+  data <- read.table(file)
+  dim_data <- dim(data)
+  summary_list[[file]] <- dim_data
+
+  # 生成直方图并保存为PDF文件
+  png(paste0(file, "_hist.png"))
+#   pdf(paste0(file, "_hist.pdf"))
+  hist(abs(as.numeric(data[, 1])), breaks = 500, xlab = "peak length (bp)", ylab = "Frequency", main = file)
+  dev.off()
+}
+
+for (file in file_list) {
+  cat("Summary for", file, ":\n")
+  print(summary_list[[file]])
+}
 ```
 4. TSS enrichment在下一节展示，很重要的判断质量的标准
 
