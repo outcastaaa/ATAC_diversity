@@ -1527,7 +1527,10 @@ for (region in regions) {
   txdb <- TxDb.Mmusculus.UCSC.mm10.knownGene
   promoter <- getPromoters(TxDb = txdb, upstream = 1000, downstream = 1000)
   tagMatrix <- getTagMatrix(region_peak, windows = promoter)
+  png(paste0(region, "_promoter.png"))
   tagHeatmap(tagMatrix, xlim = c(-1000, 1000), color = "red")
+  dev.off()
+
 
   png(paste0(region, "_avg_prof_plot.png"))
   plotAvgProf(
@@ -1576,6 +1579,13 @@ for (region in regions) {
 ```
 
 ```r
+library(biomaRt)
+library(ChIPseeker)
+library(GenomicFeatures)
+library(TxDb.Mmusculus.UCSC.mm10.knownGene)
+library(org.Mm.eg.db)
+library(clusterProfiler)
+
 regions <- c("HIPP", "PFC", "cortex", "DG", "STR", "CERE", "OLF", "SEN")
 
 for (region in regions) {
@@ -1591,6 +1601,7 @@ for (region in regions) {
   png(paste0(region, "_promoter.png"))
   tagHeatmap(tagMatrix, xlim = c(-1000, 1000), color = "red")
   dev.off()
+
 
   png(paste0(region, "_avg_prof_plot.png"))
   plotAvgProf(
@@ -1620,6 +1631,7 @@ for (region in regions) {
   dev.off()
 
   region_peakAnno <- as.data.frame(region_peakAnnolist)
+
   ensembl_id_transform <- function(ENSEMBL_ID) {
     a = bitr(ENSEMBL_ID, fromType = "ENSEMBL", toType = c("SYMBOL", "ENTREZID"), OrgDb = "org.Mm.eg.db")
     return(a)
@@ -1650,9 +1662,8 @@ for (region in regions) {
   barplot(region_biomart, showCategory = 40, font.size = 6, title = paste("The GO BP enrichment analysis", sep = ""))
   dev.off()
 
-
   region_transform <- enrichGO(
-    gene = region_ensembl_id_transform$entrezgene_id, 
+    gene = region_ensembl_id_transform$ENTREZID, 
     keyType = "ENTREZID",
     OrgDb = org.Mm.eg.db,
     ont = "BP",
@@ -1664,9 +1675,8 @@ for (region in regions) {
   barplot(region_transform, showCategory = 40, font.size = 6, title = paste("The GO BP enrichment analysis", sep = ""))
   dev.off()
 
-
   region_kegg <- enrichKEGG(
-    gene = region_ensembl_id_transform$entrezgene_id,
+    gene = region_ensembl_id_transform$ENTREZID,
     organism = 'mmu',
     pvalueCutoff = 0.05,
     pAdjustMethod = "BH"
