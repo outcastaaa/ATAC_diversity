@@ -8,9 +8,10 @@
 - [7. Quality cheak](#7-quality-check)
 - [8. Visualization](#8-visualization)
 - [9. 相同组织rep间consensus peak](#9-寻找rep间consensus-peak) 
+- [10. 每个脑区独有peak](#10-每个脑区独有peak)
 
 
-- [10. 不同组织可重复peak](#10-不同组织可重复peak)  
+- [11. 不同组织可重复peak](#11-不同组织可重复peak)  
 - [9. diffbind](#9-使用diffbind做主成分分析)
 
 
@@ -1514,71 +1515,6 @@ barplot(HIPP_kegg, showCategory = 20, title = "KEGG Pathway Enrichment Analysis"
 ```
 ② 循环
 ```r
-
-regions <- c("HIPP", "PFC", "cortex", "DG", "STR", "CERE", "OLF", "SEN")
-
-for (region in regions) {
-  region_peak <- readPeakFile(paste0("D:/ATAC_brain/mouse/GO/", region, "_pool_merge.bed"), sep = "")
-
-  png(paste0(region, "_covplot.png"))
-  covplot(region_peak)
-  dev.off()
-
-  txdb <- TxDb.Mmusculus.UCSC.mm10.knownGene
-  promoter <- getPromoters(TxDb = txdb, upstream = 1000, downstream = 1000)
-  tagMatrix <- getTagMatrix(region_peak, windows = promoter)
-  png(paste0(region, "_promoter.png"))
-  tagHeatmap(tagMatrix, xlim = c(-1000, 1000), color = "red")
-  dev.off()
-
-
-  png(paste0(region, "_avg_prof_plot.png"))
-  plotAvgProf(
-    tagMatrix,
-    xlim = c(-1000, 1000),
-    xlab = "Genomic Region (5'->3')",
-    ylab = "Peak Frequency"
-  )
-  dev.off()
-
-  region_peakAnnolist <- annotatePeak(
-    region_peak,
-    tssRegion = c(-1000, 1000),
-    TxDb = txdb,
-    annoDb = "org.Mm.eg.db"
-  )
-  write.table(
-    as.data.frame(region_peakAnnolist),
-    file = paste0(region, "_allpeak.annotation.tsv"),
-    sep = "\t",
-    row.names = FALSE,
-    quote = FALSE
-  )
-
-  png(paste0(region, "_plotAnnoPie.png"))
-  plotAnnoPie(region_peakAnnolist)
-  dev.off()
-
-  region_peakAnno <- as.data.frame(region_peakAnnolist)
-  ensembl_id_transform <- function(ENSEMBL_ID) {
-    a = bitr(ENSEMBL_ID, fromType = "ENSEMBL", toType = c("SYMBOL", "ENTREZID"), OrgDb = "org.Mm.eg.db")
-    return(a)
-  }
-  region_ensembl_id_transform <- ensembl_id_transform(region_peakAnno$ENSEMBL)
-  write.csv(ensembl_id_transform(region_peakAnno$ENSEMBL), file = paste0(region, "_allpeak_geneID.tsv"), quote = FALSE)
-
-  mart <- useDataset("mmusculus_gene_ensembl", useMart("ENSEMBL_MART_ENSEMBL"))
-  region_biomart_ensembl_id_transform <- getBM(
-    attributes = c("ensembl_gene_id", "external_gene_name", "entrezgene_id", "description"),
-    filters = "ensembl_gene_id",
-    values = region_peakAnno$ENSEMBL,
-    mart = mart
-  )
-  write.csv(region_biomart_ensembl_id_transform, file = paste0(region, "_allpeak_biomart_geneID.tsv"), quote = FALSE)
-}
-```
-
-```r
 library(biomaRt)
 library(ChIPseeker)
 library(GenomicFeatures)
@@ -1693,8 +1629,283 @@ for (region in regions) {
 }
 ```
 
+# 10. 每个脑区独有peak  
+
+脑区：老年HIPP,PFC,cortex,STR,DG,OLF,SEN,CERE  
+因为脑区中，HIPP包含DG，cortex包含PFC，因此为了找到特异性peak，多次举例，排除掉包含关系的脑区。
+
+# 10.1 排除老年HIPP+cortex  
+
+脑区：PFC,STR,DG,OLF,SEN,CERE    
+
+1. total diff peaks 
+```bash
+mkdir -p /mnt/xuruizhi/ATAC_brain/mouse/diff_peak1
+cp /mnt/xuruizhi/ATAC_brain/mouse/IDR/*_pool_merge.bed  /mnt/xuruizhi/ATAC_brain/mouse/diff_peak1
+cd /mnt/xuruizhi/ATAC_brain/mouse/diff_peak1
+rm cortex_pool_merge.bed HIPP_pool_merge.bed
+
+# 将文件写入list
+vim files.list
+CERE_pool_merge.bed
+DG_pool_merge.bed
+OLF_pool_merge.bed
+PFC_pool_merge.bed
+SEN_pool_merge.bed
+STR_pool_merge.bed
+
+vim totaldiff_peaks.sh
+#!/bin/bash
+# this script is to genrate total diff peaks.
+# PFC,STR,DG,OLF,SEN,CERE
+
+readarray -t files
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+for ((i=0; i<${#files[@]}; i++))
+do
+    file="${files[$i]//$'\n'/}"
+
+    output_file="${file%%.*}_totaldiff.bed"
+    output_path="$script_dir/$output_file"
+    a_file="$file"
+    b_files=("${files[@]:0:i}" "${files[@]:i+1}")
+
+    command="bedtools intersect -a \"$a_file\" -b ${b_files[@]} -sorted -v > \"$output_path\""
+    eval "$command"
+done
+
+cat files.list | bash totaldiff_peaks.sh
+``` 
+2. 结果
+```bash
+cd /mnt/xuruizhi/ATAC_brain/mouse/diff_peak1
+find . -type f -name "*_pool_merge_totaldiff.bed" -exec sh -c 'mv "$0" "${0%_pool_merge_totaldiff.bed}_totaldiff.bed"' {} \;
+
+wc -l *  
+  #  80559 CERE_pool_merge.bed
+  #  24792 CERE_totaldiff.bed
+  #  21918 DG_pool_merge.bed
+  #   1648 DG_totaldiff.bed
+  #  95345 OLF_pool_merge.bed
+  #  19895 OLF_totaldiff.bed
+  #  91720 PFC_pool_merge.bed
+  #   4432 PFC_totaldiff.bed
+  # 181048 SEN_pool_merge.bed
+  #  52769 SEN_totaldiff.bed
+  #  53130 STR_pool_merge.bed
+  #  12921 STR_totaldiff.bed
+```  
+
+3. 富集分析  
+
+```bash
+
+mkdir -p /mnt/d/ATAC_brain/mouse/GO_totaldiff
+cp /mnt/xuruizhi/ATAC_brain/mouse/diff_peak1/*_totaldiff.bed /mnt/d/ATAC_brain/mouse/GO_totaldiff/
+```
+
+```r 
+library(biomaRt)
+library(ChIPseeker)
+library(GenomicFeatures)
+library(TxDb.Mmusculus.UCSC.mm10.knownGene)
+library(org.Mm.eg.db)
+library(clusterProfiler)
+regions <- c("CERE")
+regions <- c("DG")
+regions <- c("OLF")
+regions <- c("PFC")
+regions <- c("SEN")
+regions <- c("STR")
 
 
+for (region in regions) {
+  region_peak <- readPeakFile(paste0("D:/ATAC_brain/mouse/GO_totaldiff/", region, "_totaldiff.bed"), sep = "")
+
+  png(paste0(region, "_covplot.png"))
+  covplot(region_peak)
+  dev.off()
+
+  txdb <- TxDb.Mmusculus.UCSC.mm10.knownGene
+  promoter <- getPromoters(TxDb = txdb, upstream = 1000, downstream = 1000)
+  tagMatrix <- getTagMatrix(region_peak, windows = promoter)
+  png(paste0(region, "_promoter.png"))
+  tagHeatmap(tagMatrix, xlim = c(-1000, 1000), color = "red")
+  dev.off()
+
+
+  png(paste0(region, "_avg_prof_plot.png"))
+  plotAvgProf(
+    tagMatrix,
+    xlim = c(-1000, 1000),
+    xlab = "Genomic Region (5'->3')",
+    ylab = "Peak Frequency"
+  )
+  dev.off()
+
+  region_peakAnnolist <- annotatePeak(
+    region_peak,
+    tssRegion = c(-1000, 1000),
+    TxDb = txdb,
+    annoDb = "org.Mm.eg.db"
+  )
+  write.table(
+    as.data.frame(region_peakAnnolist),
+    file = paste0(region, "_allpeak.annotation.tsv"),
+    sep = "\t",
+    row.names = FALSE,
+    quote = FALSE
+  )
+
+  png(paste0(region, "_plotAnnoPie.png"))
+  plotAnnoPie(region_peakAnnolist)
+  dev.off()
+
+  region_peakAnno <- as.data.frame(region_peakAnnolist)
+
+  ensembl_id_transform <- function(ENSEMBL_ID) {
+    a = bitr(ENSEMBL_ID, fromType = "ENSEMBL", toType = c("SYMBOL", "ENTREZID"), OrgDb = "org.Mm.eg.db")
+    return(a)
+  }
+  region_ensembl_id_transform <- ensembl_id_transform(region_peakAnno$ENSEMBL)
+  write.csv(ensembl_id_transform(region_peakAnno$ENSEMBL), file = paste0(region, "_allpeak_geneID.tsv"), quote = FALSE)
+
+  mart <- useDataset("mmusculus_gene_ensembl", useMart("ENSEMBL_MART_ENSEMBL"))
+  region_biomart_ensembl_id_transform <- getBM(
+    attributes = c("ensembl_gene_id", "external_gene_name", "entrezgene_id", "description"),
+    filters = "ensembl_gene_id",
+    values = region_peakAnno$ENSEMBL,
+    mart = mart
+  )
+  write.csv(region_biomart_ensembl_id_transform, file = paste0(region, "_allpeak_biomart_geneID.tsv"), quote = FALSE)
+
+  # GO analysis and barplot
+  region_biomart <- enrichGO(
+    gene = region_biomart_ensembl_id_transform$entrezgene_id, 
+    keyType = "ENTREZID",
+    OrgDb = org.Mm.eg.db,
+    ont = "BP",
+    pAdjustMethod = "BH",
+    qvalueCutoff = 0.05,
+    readable = TRUE
+  )
+  pdf(file = paste0(region, "_biomart.pdf"))
+  barplot(region_biomart, showCategory = 40, font.size = 6, title = paste("The GO BP enrichment analysis", sep = ""))
+  dev.off()
+
+  region_transform <- enrichGO(
+    gene = region_ensembl_id_transform$ENTREZID, 
+    keyType = "ENTREZID",
+    OrgDb = org.Mm.eg.db,
+    ont = "BP",
+    pAdjustMethod = "BH",
+    qvalueCutoff = 0.05,
+    readable = TRUE
+  )
+  pdf(file = paste0(region, "_transform.pdf"))
+  barplot(region_transform, showCategory = 40, font.size = 6, title = paste("The GO BP enrichment analysis", sep = ""))
+  dev.off()
+
+  region_kegg <- enrichKEGG(
+    gene = region_ensembl_id_transform$ENTREZID,
+    organism = 'mmu',
+    pvalueCutoff = 0.05,
+    pAdjustMethod = "BH"
+  )
+  pdf(file = paste0(region, "_kegg.pdf"))
+  barplot(region_kegg, showCategory = 20, title = "KEGG Pathway Enrichment Analysis")
+  dev.off()
+}
+
+
+DG太少了，没办法找到功能相关的pathway
+  #  21918 DG_pool_merge.bed
+  #   1648 DG_totaldiff.bed
+
+peaks在TSS富集，但是也有很大波动
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+## 10.3 以A文件为主
+```bash
+# 以HIPP为主
+bedtools intersect -wa -u -a HIPP_pool_merge.bed -b PFC_pool_merge.bed cortex_pool_merge.bed -sorted 
+```
+## 10.4 A,B,C重叠并取原来的peak，交集再交集 ————以此为准
+
+只取a&b，a&c，b&c相交长度占总长的50%以上的部分，再取交集，看此交集对应的peak原位置  
+
+```bash
+# 建目录
+mkdir -p /mnt/xuruizhi/brain/common_peak_final/0.5/mouse
+mkdir -p /mnt/xuruizhi/brain/common_peak_final/0.8/mouse
+mkdir -p /mnt/xuruizhi/brain/common_peak_final/0.9/mouse
+
+cd /mnt/xuruizhi/brain/IDR_final/mouse
+cp ./*_pool_merge.bed /mnt/xuruizhi/brain/common_peak_final/0.5/mouse
+cp ./*_pool_merge.bed /mnt/xuruizhi/brain/common_peak_final/0.8/mouse
+cp ./*_pool_merge.bed /mnt/xuruizhi/brain/common_peak_final/0.9/mouse
+
+# 将间隔小于50bp的reads合并
+sort -k1,1 -k2,2n HIPP_pool_merge.bed > HIPP.bed
+bedtools merge -i HIPP.bed -d 50 > all.bed
+# 发现数目一样，还是使用HIPP_pool_merge.bed,其他也一样
+```
+① 重叠50% 
+```bash
+cd /mnt/xuruizhi/brain/common_peak_final/0.5/mouse
+# 只取a&b，a&c，b&c相交长度占总长的50%以上的部分，再取交集，看此交集对应的peak原位置
+## 计算两两相交占比大于50%的部分
+## a&b
+bedtools intersect -a HIPP_pool_merge.bed -b PFC_pool_merge.bed -sorted -f 0.5 -r > 1HIPP_PFC_0.5.bed  # 18064 1HIPP_PFC_0.5.bed
+## a&c
+bedtools intersect -a HIPP_pool_merge.bed -b cortex_pool_merge.bed -sorted -f 0.5 -r > 2HIPP_cortex_0.5.bed  # 14973 2HIPP_cortex_0.5.bed
+## b&c
+bedtools intersect -a cortex_pool_merge.bed -b PFC_pool_merge.bed -sorted -f 0.5 -r > 3cortex_PFC_0.5.bed  # 35612 3cortex_PFC_0.5.bed
+
+
+# 算出三个部分相交的小块，再看此交集对应的peak原位置
+## 1&2 取相交部分
+bedtools intersect -a 1HIPP_PFC_0.5.bed -b 2HIPP_cortex_0.5.bed > 4_12_0.5.bed  #  13853 4_12_0.5.bed
+## 把1&2相交部分再与3相交
+bedtools intersect -a 3cortex_PFC_0.5.bed -b 4_12_0.5.bed > 5_123_0.5.bed  #  13483 5_123_0.5.bed，此文件就是他们三个相交的共有区域
+
+## 使用bedtools intersect命令对HIPP_pool_merge.bed文件与5_123_0.5.bed文件进行交集计算，输出包含交集区域中的HIPP所有行，并且去除重复的行。输入文件已经按照染色体名称和位置进行了排序。
+bedtools intersect -wa -u -a HIPP_pool_merge.bed -b 5_123_0.5.bed -sorted > 6HIPP_commonpeak.bed
+  # 13483 6HIPP_commonpeak.bed 共有peak约占HIPP的一半
+  # 21531 HIPP_pool_merge.bed
+bedtools intersect -wa -u -a PFC_pool_merge.bed -b 5_123_0.5.bed -sorted > 7PFC_commonpeak.bed
+  # 13483 7PFC_commonpeak.bed
+  # 58240 PFC_pool_merge.bed
+bedtools intersect -wa -u -a cortex_pool_merge.bed -b 5_123_0.5.bed -sorted > 8cortex_commonpeak.bed
+  # 13483 8cortex_commonpeak.bed
+  # 45265 cortex_pool_merge.bed
+
+mkdir -p /mnt/d/brain/brain/common_peak_final/0.5/mouse
+cp /mnt/xuruizhi/brain/common_peak_final/0.5/mouse/* /mnt/d/brain/brain/common_peak_final/0.5/mouse
+```
 
 
 
