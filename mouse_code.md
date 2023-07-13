@@ -1021,7 +1021,7 @@ for (file in file_list) {
 
   # 生成直方图并保存为png文件
   png(paste0(file, "_hist.png"))
-#   pdf(paste0(file, "_hist.pdf"))
+  # pdf(paste0(file, "_hist.pdf"))
   hist(abs(as.numeric(data[, 1])), breaks = 500, xlab = "peak length (bp)", ylab = "Frequency", main = file)
   dev.off()
 }
@@ -1632,7 +1632,7 @@ for (region in regions) {
 # 10. 每个脑区独有peak  
 
 脑区：老年HIPP,PFC,cortex,STR,DG,OLF,SEN,CERE  
-因为脑区中，HIPP包含DG，cortex包含PFC，因此为了找到特异性peak，多次举例，排除掉包含关系的脑区。
+因为脑区中，HIPP包含DG，cortex包含PFC、SEN，因此为了找到特异性peak，多次举例，排除掉包含关系的脑区。
 
 # 10.1 排除老年HIPP+cortex  
 
@@ -1696,11 +1696,39 @@ wc -l *
   #  53130 STR_pool_merge.bed
   #  12921 STR_totaldiff.bed
 ```  
+3. 长度计算
+```bash
+cd /mnt/xuruizhi/ATAC_brain/mouse/diff_peak1
+ls *_totaldiff.bed | while read id
+do
+  awk '{print ($3-$2)}' ${id} > ${id%%.*}_length.txt
+done
+cp /mnt/xuruizhi/ATAC_brain/mouse/diff_peak1/*_length.txt /mnt/d/ATAC_brain/mouse/GO_totaldiff/
+```
+```r
+regions <- c("CERE")
+regions <- c("DG")
+regions <- c("OLF")
+regions <- c("PFC")
+regions <- c("SEN")
+regions <- c("STR")
 
-3. 富集分析  
+
+for (region in regions) {
+  region_length <- readPeakFile(paste0("D:/ATAC_brain/mouse/GO_totaldiff/", region, "_totaldiff_length.txt"), sep = "")
+  summary(region_length[1,])
+}
+a<-read.table('./GO_totaldiff/PFC_totaldiff_length.txt')
+dim(a)
+png('PFC_hist.png')
+hist(abs(as.numeric(a[,1])),breaks=500,xlab = "Fragment length(bp)",ylab = "Frequency",main = "PFC peak length")
+dev.off()
+```
+
+
+4. 富集分析  
 
 ```bash
-
 mkdir -p /mnt/d/ATAC_brain/mouse/GO_totaldiff
 cp /mnt/xuruizhi/ATAC_brain/mouse/diff_peak1/*_totaldiff.bed /mnt/d/ATAC_brain/mouse/GO_totaldiff/
 ```
@@ -1817,14 +1845,16 @@ for (region in regions) {
   barplot(region_kegg, showCategory = 20, title = "KEGG Pathway Enrichment Analysis")
   dev.off()
 }
+```
 
-
-DG太少了，没办法找到功能相关的pathway
+3. 结果
+① DG太少了，没办法找到功能相关的pathway；也有可能是因为DG不足以代表HIPP的功能，富集不到学习与记忆；peaks在TSS富集，但是也有很大波动
+```bash
   #  21918 DG_pool_merge.bed
   #   1648 DG_totaldiff.bed
-
-peaks在TSS富集，但是也有很大波动
 ```
+
+
 
 
 
