@@ -9,10 +9,8 @@
 - [8. Visualization](#8-visualization)
 - [9. 相同组织rep间consensus peak](#9-寻找rep间consensus-peak) 
 - [10. 每个脑区独有peak](#10-每个脑区独有peak)
-
-
-- [11. 不同组织可重复peak](#11-不同组织可重复peak)  
-- [9. diffbind](#9-使用diffbind做主成分分析)
+- [11. 每个脑区共有peak](#11-每个脑区共有peak)  
+- [12. 对应RNA-seq数据](#12-对应rna-seq数据)
 
 
 # 0. 安装下载
@@ -2354,7 +2352,9 @@ region_peak <- readPeakFile(paste0("D:/ATAC_brain/mouse/GO_totaldiff6/", region,
 
 
 
-## 10.3 以A文件为主
+# 11. 每个脑区共有peak
+
+还没有做该部分
 ```bash
 # 以HIPP为主
 bedtools intersect -wa -u -a HIPP_pool_merge.bed -b PFC_pool_merge.bed cortex_pool_merge.bed -sorted 
@@ -2415,9 +2415,8 @@ cp /mnt/xuruizhi/brain/common_peak_final/0.5/mouse/* /mnt/d/brain/brain/common_p
 
 
 
-
-
-
+# 12. 对应RNA-seq数据
+# 12.1 下载数据
 
 
 
