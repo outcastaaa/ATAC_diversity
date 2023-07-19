@@ -2517,6 +2517,9 @@ trim_galore --phred33 --length 35 -e 0.1 --stringency 3 --paired -o ../trim  {}_
 fastqc -t 6 -o ../fastqc_again ../trim/{}_1_val_1.fq.gz
 fastqc -t 6 -o ../fastqc_again ../trim/{}_2_val_2.fq.gz
 
+
+
+
 cat pair.list | while read id
 do
   sed "s/{}/${id}/g" mouse_pair.sh > ${id}_pair_trim.sh
@@ -2526,7 +2529,7 @@ cat pair.list | parallel --no-run-if-empty --linebuffer -k -j 6 "
 
 
 # 单端
-cd /mnt/xuruizhi/ATAC_brain/mouse/sequence
+cd /mnt/xuruizhi/RNA_brain/mouse/sequence
 cat >single.list <<EOF
 SRR13443447
 SRR13443448
@@ -2551,22 +2554,23 @@ trim_galore --phred33 --length 35 -e 0.1 --stringency 3 -o ../trim {}.fastq.gz
 fastqc -t 6 -o ../fastqc_again ../trim/{}_trimmed.fq.gz
 
 
+
+
 cat single.list | while read id
 do
   sed "s/{}/${id}/g" mouse_single.sh > ${id}_single_trim.sh
-  bash ${id}_single_trim.sh >> ./trim_fastqc.log 2>&1
+  bash ${id}_single_trim.sh >> ../trim/trim_fastqc.log 2>&1
 done
 
-cd  /mnt/xuruizhi/ATAC_brain/mouse/fastqc_again
+
 multiqc .
 
 # 因为CG含量质控不合格，删除了
-SRR11179779_1_val_1
-SRR11179779_2_val_2
-SRR13049360_1_val_1
-SRR13049360_2_val_2
-SRR13049361_1_val_1
-SRR13049361_2_val_2
+# SRR14494965 2质量不合格，但是1还可以，保留
+SRR14494966 
+SRR14494968 
+SRR14494970 
+SRR14494971 
 ```
 ```bash
 # 传到超算
