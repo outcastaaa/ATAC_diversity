@@ -331,14 +331,11 @@ mkdir -p /scratch/wangq/xrz/ATAC_brain/mouse/align/
 cd /scratch/wangq/xrz/ATAC_brain/mouse/trim
 
 # 双端
-bowtie2  -p 48 -x /scratch/wangq/xrz/ATAC_brain/mouse/genome/mm10 \
---very-sensitive -X 2000 -1 /scratch/wangq/xrz/ATAC_brain/mouse/trim/{}_1_trimmed.fq.gz \
--2 /scratch/wangq/xrz/ATAC_brain/mouse/trim/{}_2_trimmed.fq.gz \
--S /scratch/wangq/xrz/ATAC_brain/mouse/align/{}.sam
+bowtie2  -p 96 -x /scratch/wangq/xrz/ATAC_brain/mouse/genome/mm10 \ --very-sensitive -X 2000 -1 /scratch/wangq/xrz/ATAC_brain/mouse/trim/{}_1_val_1.fq.gz \
+-2 /scratch/wangq/xrz/ATAC_brain/mouse/trim/{}_2_val_2.fq.gz -S /scratch/wangq/xrz/ATAC_brain/mouse/align/{}.sam
 
 # 单端
-bowtie2  -p 48 -x /scratch/wangq/xrz/ATAC_brain/mouse/genome/mm10 \
---very-sensitive -X 2000 -U /scratch/wangq/xrz/ATAC_brain/mouse/trim/{}_trimmed.fq.gz \
+bowtie2  -p 96 -x /scratch/wangq/xrz/ATAC_brain/mouse/genome/mm10 \ --very-sensitive -X 2000 -U /scratch/wangq/xrz/ATAC_brain/mouse/trim/{}_trimmed.fq.gz \
 -S /scratch/wangq/xrz/ATAC_brain/mouse/align/{}.sam
 ```
 
@@ -2589,83 +2586,123 @@ wangq@202.119.37.251:/scratch/wangq/xrz/ATAC_brain/mouse/
 ```bash
 # 小鼠 mm10 
 mkdir -p /mnt/xuruizhi/RNA_brain/mouse/genome
-cd /mnt/xuruizhi/RNA_brain/mouse/genome
+mkdir -p /mnt/d/RNA_brain/mouse/genome
+cd /mnt/d/RNA_brain/mouse/genome
 wget https://genome-idx.s3.amazonaws.com/hisat/mm10_genome.tar.gz
-tar -xvzf mm10_genome.tar.gz
+tar xvzf mm10_genome.tar.gz
+rm mm10_genome.tar.gz
+cp -r /mnt/d/RNA_brain/mouse/genome/* /mnt/xuruizhi/RNA_brain/mouse/genome
 
-# 进入超算,通过beyond compare传输
+# 通过beyond compare传输超算
 mkdir -p /scratch/wangq/xrz/RNA_brain/mouse/
 
 
-cd /scratch/wangq/xrz/ATAC_brain/mouse/trim
+cd /mnt/xuruizhi/RNA_brain/mouse/trim
 vim pair.list
-SRR11179780
-SRR11179781
-SRR13049359
-SRR13049362
-SRR13049363
-SRR13049364
-SRR14362271
-SRR14362272
-SRR14362275
-SRR14362276
-SRR14362281
-SRR14362282
-SRR3595211
-SRR3595212
-SRR3595213
-SRR3595214
+SRR14494965 
+SRR14494974 
+SRR3595255 
+SRR3595256 
+SRR3595258 
+SRR11179785 
+SRR11179786 
+SRR11179787
+
 
 vim single.list
-SRR13443549
-SRR13443553
-SRR13443554
+SRR13443447 
+SRR13443448 
+SRR13443449 
 ```
 
 2. 比对
 ```bash
-mkdir -p /scratch/wangq/xrz/ATAC_brain/mouse/align/
+mkdir -p /mnt/xuruizhi/RNA_brain/mouse/align
 # 循环 
-cd /scratch/wangq/xrz/ATAC_brain/mouse/trim
+cd /mnt/xuruizhi/RNA_brain/mouse/trim
 
 # 双端
-bowtie2  -p 48 -x /scratch/wangq/xrz/ATAC_brain/mouse/genome/mm10 \
---very-sensitive -X 2000 -1 /scratch/wangq/xrz/ATAC_brain/mouse/trim/{}_1_trimmed.fq.gz \
--2 /scratch/wangq/xrz/ATAC_brain/mouse/trim/{}_2_trimmed.fq.gz \
--S /scratch/wangq/xrz/ATAC_brain/mouse/align/{}.sam
+hisat2 -p 6 -t -x ../genome/mm10 -1 {}_1_val_1.fq.gz -2 {}_2_val_2.fq.gz -S ../align/{}.sam 2>../align/{}.log 2>&1
 
 # 单端
-bowtie2  -p 48 -x /scratch/wangq/xrz/ATAC_brain/mouse/genome/mm10 \
---very-sensitive -X 2000 -U /scratch/wangq/xrz/ATAC_brain/mouse/trim/{}_trimmed.fq.gz \
--S /scratch/wangq/xrz/ATAC_brain/mouse/align/{}.sam
+hisat2 -p 6 -t -x ../genome/mm10 -U {}_trimmed.fq.gz -S ../align/{}.sam 2>../align/{}.log 2>&1
 ```
 
 3. sort_transfertobam_index  
 ```bash
-mkdir -p /scratch/wangq/xrz/ATAC_brain/mouse/sort_bam
+mkdir -p /mnt/xuruizhi/RNA_brain/mouse/sort_bam
 # 双端与单端一致
-samtools sort -@ 48 /scratch/wangq/xrz/ATAC_brain/mouse/align/{}.sam \
-> /scratch/wangq/xrz/ATAC_brain/mouse/sort_bam/{}.sort.bam
-samtools index -@ 48 /scratch/wangq/xrz/ATAC_brain/mouse/sort_bam/{}.sort.bam
-samtools flagstat  -@ 48 /scratch/wangq/xrz/ATAC_brain/mouse/sort_bam/{}.sort.bam \
-> /scratch/wangq/xrz/ATAC_brain/mouse/sort_bam/{}.raw.stat
+samtools sort -@ 6 ../align/{}.sam > ../sort_bam/{}.sort.bam
+samtools index -@ 6 ../sort_bam/{}.sort.bam
+samtools flagstat  -@ 6 ../sort_bam/{}.sort.bam > ../sort_bam/{}.raw.stat
 ```
 4. 大批量处理
 ```bash
-cd /scratch/wangq/xrz/ATAC_brain/mouse/trim
+mkdir -p /mnt/xuruizhi/RNA_brain/mouse/align
+mkdir -p /mnt/xuruizhi/RNA_brain/mouse/sort_bam
+cd /mnt/xuruizhi/RNA_brain/mouse/trim
+
+vim mouse_pair.sh
+#!/usr/bin bash
+# This script is for pair-end sequence.
+
+# sra2fq.sh
+# fastq-dump --gzip --split-3 -O /mnt/xuruizhi/ATAC_brain/mouse/sequence /mnt/xuruizhi/ATAC_brain/mouse/sra/{}/{}.sra
+
+# fastqc
+#  fastqc -t 6 -o ../fastqc {}_1.fastq.gz
+#  fastqc -t 6 -o ../fastqc {}_2.fastq.gz
+
+# # trim
+# trim_galore --phred33 --length 35 -e 0.1 --stringency 3 --paired -o ../trim  {}_1.fastq.gz  {}_2.fastq.gz
+
+# # fatsqc_again
+# fastqc -t 6 -o ../fastqc_again ../trim/{}_1_val_1.fq.gz
+# fastqc -t 6 -o ../fastqc_again ../trim/{}_2_val_2.fq.gz
+
+# align and sort
+hisat2 -p 6 -t -x ../genome/mm10 -1 {}_1_val_1.fq.gz -2 {}_2_val_2.fq.gz -S ../align/{}.sam 2>../align/{}.log 2>&1
+samtools sort -@ 6 ../align/{}.sam > ../sort_bam/{}.sort.bam
+samtools index -@ 6 ../sort_bam/{}.sort.bam
+samtools flagstat  -@ 6 ../sort_bam/{}.sort.bam > ../sort_bam/{}.raw.stat
+
+
+vim mouse_single.sh
+#!/usr/bin bash
+# This script is for single-end sequence.
+
+# sra2fq.sh
+# fastq-dump --gzip --split-3 -O /mnt/xuruizhi/ATAC_brain/mouse/sequence /mnt/xuruizhi/ATAC_brain/mouse/sra/{}/{}.sra
+
+# fastqc
+# fastqc -t 6 -o ../fastqc {}.fastq.gz
+
+# # trim
+# trim_galore --phred33 --length 35 -e 0.1 --stringency 3 -o ../trim {}.fastq.gz
+
+# # fatsqc_again
+# fastqc -t 6 -o ../fastqc_again ../trim/{}_trimmed.fq.gz
+
+# align
+hisat2 -p 6 -t -x ../genome/mm10 -U {}_trimmed.fq.gz -S ../align/{}.sam 2>../align/{}.log 2>&1
+samtools sort -@ 6 ../align/{}.sam > ../sort_bam/{}.sort.bam
+samtools index -@ 6 ../sort_bam/{}.sort.bam
+samtools flagstat  -@ 6 ../sort_bam/{}.sort.bam > ../sort_bam/{}.raw.stat
+```
+```bash
+cd /mnt/xuruizhi/RNA_brain/mouse/trim
+
 # 双端 
 cat pair.list  | while read id
 do 
   sed "s/{}/${id}/g" mouse_pair.sh > ${id}_pair_align.sh
-  bsub -q mpi -n 96 -o ../align "
-  bash  ${id}_pair_align.sh >> ../align/align.log 2>&1"
+  bash  ${id}_pair_align.sh >> ../align/align.log 2>&1
 done
 # 单端
 cat single.list  | while read id
 do 
-  sed "s/{}/${id}/g" mouse_single.sh > ${id}_single_align.sh;
-  bsub -q largemem -n 96 -o ../align "
-  bash ${id}_single_align.sh >> ../align/align_single.log 2>&1"
+  sed "s/{}/${id}/g" mouse_single.sh > ${id}_single_align.sh
+  bash ${id}_single_align.sh >> ../align/align_single.log 2>&1
 done
 ```
 
