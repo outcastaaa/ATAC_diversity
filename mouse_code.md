@@ -2583,6 +2583,91 @@ rsync -av /mnt/xuruizhi/ATAC_brain/mouse/fastqc_again \
 wangq@202.119.37.251:/scratch/wangq/xrz/ATAC_brain/mouse/
 ```
 
+# 12.3 比对
+
+1. 参考基因组  
+```bash
+# 小鼠 mm10 
+mkdir -p /mnt/xuruizhi/RNA_brain/mouse/genome
+cd /mnt/xuruizhi/RNA_brain/mouse/genome
+wget https://genome-idx.s3.amazonaws.com/hisat/mm10_genome.tar.gz
+tar -xvzf mm10_genome.tar.gz
+
+# 进入超算,通过beyond compare传输
+mkdir -p /scratch/wangq/xrz/RNA_brain/mouse/
+
+
+cd /scratch/wangq/xrz/ATAC_brain/mouse/trim
+vim pair.list
+SRR11179780
+SRR11179781
+SRR13049359
+SRR13049362
+SRR13049363
+SRR13049364
+SRR14362271
+SRR14362272
+SRR14362275
+SRR14362276
+SRR14362281
+SRR14362282
+SRR3595211
+SRR3595212
+SRR3595213
+SRR3595214
+
+vim single.list
+SRR13443549
+SRR13443553
+SRR13443554
+```
+
+2. 比对
+```bash
+mkdir -p /scratch/wangq/xrz/ATAC_brain/mouse/align/
+# 循环 
+cd /scratch/wangq/xrz/ATAC_brain/mouse/trim
+
+# 双端
+bowtie2  -p 48 -x /scratch/wangq/xrz/ATAC_brain/mouse/genome/mm10 \
+--very-sensitive -X 2000 -1 /scratch/wangq/xrz/ATAC_brain/mouse/trim/{}_1_trimmed.fq.gz \
+-2 /scratch/wangq/xrz/ATAC_brain/mouse/trim/{}_2_trimmed.fq.gz \
+-S /scratch/wangq/xrz/ATAC_brain/mouse/align/{}.sam
+
+# 单端
+bowtie2  -p 48 -x /scratch/wangq/xrz/ATAC_brain/mouse/genome/mm10 \
+--very-sensitive -X 2000 -U /scratch/wangq/xrz/ATAC_brain/mouse/trim/{}_trimmed.fq.gz \
+-S /scratch/wangq/xrz/ATAC_brain/mouse/align/{}.sam
+```
+
+3. sort_transfertobam_index  
+```bash
+mkdir -p /scratch/wangq/xrz/ATAC_brain/mouse/sort_bam
+# 双端与单端一致
+samtools sort -@ 48 /scratch/wangq/xrz/ATAC_brain/mouse/align/{}.sam \
+> /scratch/wangq/xrz/ATAC_brain/mouse/sort_bam/{}.sort.bam
+samtools index -@ 48 /scratch/wangq/xrz/ATAC_brain/mouse/sort_bam/{}.sort.bam
+samtools flagstat  -@ 48 /scratch/wangq/xrz/ATAC_brain/mouse/sort_bam/{}.sort.bam \
+> /scratch/wangq/xrz/ATAC_brain/mouse/sort_bam/{}.raw.stat
+```
+4. 大批量处理
+```bash
+cd /scratch/wangq/xrz/ATAC_brain/mouse/trim
+# 双端 
+cat pair.list  | while read id
+do 
+  sed "s/{}/${id}/g" mouse_pair.sh > ${id}_pair_align.sh
+  bsub -q mpi -n 96 -o ../align "
+  bash  ${id}_pair_align.sh >> ../align/align.log 2>&1"
+done
+# 单端
+cat single.list  | while read id
+do 
+  sed "s/{}/${id}/g" mouse_single.sh > ${id}_single_align.sh;
+  bsub -q largemem -n 96 -o ../align "
+  bash ${id}_single_align.sh >> ../align/align_single.log 2>&1"
+done
+```
 
 
 
