@@ -2622,10 +2622,10 @@ mkdir -p /mnt/xuruizhi/RNA_brain/mouse/align
 cd /mnt/xuruizhi/RNA_brain/mouse/trim
 
 # 双端
-hisat2 -p 6 -t -x ../genome/mm10 -1 {}_1_val_1.fq.gz -2 {}_2_val_2.fq.gz -S ../align/{}.sam 2>../align/{}.log 2>&1
+hisat2 -p 6 -t -x ../genome/mm10/genome -1 {}_1_val_1.fq.gz -2 {}_2_val_2.fq.gz -S ../align/{}.sam 2>../align/{}.log 2>&1
 
 # 单端
-hisat2 -p 6 -t -x ../genome/mm10 -U {}_trimmed.fq.gz -S ../align/{}.sam 2>../align/{}.log 2>&1
+hisat2 -p 6 -t -x ../genome/mm10/genome -U {}_trimmed.fq.gz -S ../align/{}.sam 2>../align/{}.log 2>&1
 ```
 
 3. sort_transfertobam_index  
@@ -2661,7 +2661,7 @@ vim mouse_pair.sh
 # fastqc -t 6 -o ../fastqc_again ../trim/{}_2_val_2.fq.gz
 
 # align and sort
-hisat2 -p 6 -t -x ../genome/mm10/genome -1 {}_1_val_1.fq.gz -2 {}_2_val_2.fq.gz -S ../align/{}.sam 2>../align/{}.log 2>&1
+hisat2 -p 6 -t -x ../genome/mm10/genome -1 {}_1_val_1.fq.gz -2 {}_2_val_2.fq.gz -S ../align/{}.sam 
 samtools sort -@ 6 ../align/{}.sam > ../sort_bam/{}.sort.bam
 samtools index -@ 6 ../sort_bam/{}.sort.bam
 samtools flagstat  -@ 6 ../sort_bam/{}.sort.bam > ../sort_bam/{}.raw.stat
@@ -2684,7 +2684,7 @@ vim mouse_single.sh
 # fastqc -t 6 -o ../fastqc_again ../trim/{}_trimmed.fq.gz
 
 # align
-hisat2 -p 6 -t -x ../genome/mm10/genome -U {}_trimmed.fq.gz -S ../align/{}.sam 2>../align/{}.log 2>&1
+hisat2 -p 6 -t -x ../genome/mm10/genome -U {}_trimmed.fq.gz -S ../align/{}.sam 
 samtools sort -@ 6 ../align/{}.sam > ../sort_bam/{}.sort.bam
 samtools index -@ 6 ../sort_bam/{}.sort.bam
 samtools flagstat  -@ 6 ../sort_bam/{}.sort.bam > ../sort_bam/{}.raw.stat
@@ -2696,7 +2696,7 @@ cd /mnt/xuruizhi/RNA_brain/mouse/trim
 cat pair.list  | while read id
 do 
   sed "s/{}/${id}/g" mouse_pair.sh > ${id}_pair_align.sh
-  bash  ${id}_pair_align.sh >> ../align/align.log 2>&1
+  bash  ${id}_pair_align.sh >> ../align/align_pair.log 2>&1
 done
 # 单端
 cat single.list  | while read id
