@@ -2513,66 +2513,225 @@ bedtools intersect -a HIPP_pool_merge.bed -b cortex_pool_merge.bed -sorted -f 0.
 bedtools intersect -a cortex_pool_merge.bed -b PFC_pool_merge.bed -sorted -f 0.5 -r > 3cortex_PFC_0.5.bed  # 36049 3cortex_PFC_0.5.bed
 
 
-
 # 算出三个部分相交的小块，再看此交集对应的peak原位置
 ## 1&2 取相交部分
-bedtools intersect -a 1HIPP_PFC_0.5.bed -b 2HIPP_cortex_0.5.bed > 4_12_0.5.bed  #  13853 4_12_0.5.bed
+bedtools intersect -a 1HIPP_cortex_0.5.bed -b 2HIPP_PFC_0.5.bed > cross1.bed  
+# 10003 cross1.bed
 ## 把1&2相交部分再与3相交
-bedtools intersect -a 3cortex_PFC_0.5.bed -b 4_12_0.5.bed > 5_123_0.5.bed  #  13483 5_123_0.5.bed，此文件就是他们三个相交的共有区域
+bedtools intersect -a 3HIPP_CERE_0.5.bed -b cross1.bed > cross2.bed  
+# 7223 cross2.bed
+bedtools intersect -a 4HIPP_STR_0.5.bed -b cross2.bed > cross3.bed
+# 5918 cross3.bed
+.....
+
 
 ## 使用bedtools intersect命令对HIPP_pool_merge.bed文件与5_123_0.5.bed文件进行交集计算，输出包含交集区域中的HIPP所有行，并且去除重复的行。输入文件已经按照染色体名称和位置进行了排序。
-bedtools intersect -wa -u -a HIPP_pool_merge.bed -b 5_123_0.5.bed -sorted > 6HIPP_commonpeak.bed
-  # 13483 6HIPP_commonpeak.bed 共有peak约占HIPP的一半
-  # 21531 HIPP_pool_merge.bed
-bedtools intersect -wa -u -a PFC_pool_merge.bed -b 5_123_0.5.bed -sorted > 7PFC_commonpeak.bed
-  # 13483 7PFC_commonpeak.bed
-  # 58240 PFC_pool_merge.bed
-bedtools intersect -wa -u -a cortex_pool_merge.bed -b 5_123_0.5.bed -sorted > 8cortex_commonpeak.bed
-  # 13483 8cortex_commonpeak.bed
-  # 45265 cortex_pool_merge.bed
-
-mkdir -p /mnt/d/brain/brain/common_peak_final/0.5/mouse
-cp /mnt/xuruizhi/brain/common_peak_final/0.5/mouse/* /mnt/d/brain/brain/common_peak_final/0.5/mouse
+bedtools intersect -wa -u -a HIPP_pool_merge.bed -b cross27.bed -sorted > HIPP_commonpeak.bed
+# 3587 HIPP_commonpeak.bed
 ```
 ② 循环
 ```bash
 vim common_peak_0.5.sh
 #!/bin/bash
 
-if [ -z "$1" ]; then
-  echo "请提供文件列表作为参数！"
-  exit 1
-fi
-
-file_list_path="$1"
-
-file_list=$(cat "$file_list_path")
+echo "请输入文件名列表，以空格或换行符分隔："
+read -r file_list
 
 IFS=$' \n' read -ra file_array <<< "$file_list"
 
 count=1
 
-for sample_a in "${file_array[@]}"; do
-    for sample_b in "${file_array[@]}"; do
-        if [ "$sample_a" != "$sample_b" ]; then
-            output_file="${count}$(basename "$sample_a")_$(basename "$sample_b")_0.5.bed"
-            ((count++))
-            bedtools intersect -a "$sample_a" -b "$sample_b" -sorted -f 0.5 -r > "$output_file"
-        fi
+for ((i=0; i<${#file_array[@]}; i++)); do
+    for ((j=i+1; j<${#file_array[@]}; j++)); do
+        sample_a="${file_array[i]}"
+        sample_b="${file_array[j]}"
+        output_file="${count}$(basename "${sample_a%.*}_${sample_b%.*}_0.5.bed")"
+        ((count++))
+        bedtools intersect -a "$sample_a" -b "$sample_b" -sorted -f 0.5 -r > "$output_file"
     done
 done
 
-chmod +x  common_peak_0.5.sh
-vim file.list
-HIPP_pool_merge.bed
-cortex_pool_merge.bed
-PFC_pool_merge.bed
+bash common_peak_0.5.sh
+# HIPP_pool_merge.bed cortex_pool_merge.bed PFC_pool_merge.bed CERE_pool_merge.bed STR_pool_merge.bed DG_pool_merge.bed OLF_pool_merge.bed SEN_pool_merge.bed
 
-bash common_peak_0.5.sh file.list
+wc -l *
+  #  18706 10cortex_STR_0.5.bed
+  #  11681 11cortex_DG_0.5.bed
+  #  16768 12cortex_OLF_0.5.bed
+  #  33614 13cortex_SEN_0.5.bed
+  #  19317 14PFC_CERE_0.5.bed
+  #  26701 15PFC_STR_0.5.bed
+  #  13583 16PFC_DG_0.5.bed
+  #  25421 17PFC_OLF_0.5.bed
+  #  61978 18PFC_SEN_0.5.bed
+  #  14445 19CERE_STR_0.5.bed
+  #  10927 1HIPP_cortex_0.5.bed
+  #  12397 20CERE_DG_0.5.bed
+  #  27431 21CERE_OLF_0.5.bed
+  #  32775 22CERE_SEN_0.5.bed
+  #  10638 23STR_DG_0.5.bed
+  #  19923 24STR_OLF_0.5.bed
+  #  28121 25STR_SEN_0.5.bed
+  #  12803 26DG_OLF_0.5.bed
+  #  15826 27DG_SEN_0.5.bed
+  #  47591 28OLF_SEN_0.5.bed
+  #  13063 2HIPP_PFC_0.5.bed
+  #  10008 3HIPP_CERE_0.5.bed
+  #   9793 4HIPP_STR_0.5.bed
+  #   9952 5HIPP_DG_0.5.bed
+  #  10934 6HIPP_OLF_0.5.bed
+  #  13474 7HIPP_SEN_0.5.bed
+  #  36049 8cortex_PFC_0.5.bed
+  #  13573 9cortex_CERE_0.5.bed
+
+
+vim common_peak_nextstep.sh
+#!/bin/bash
+
+echo "请输入文件名列表，以空格或换行符分隔："
+read -r file_list
+
+IFS=$' \n' read -ra file_array <<< "$file_list"
+
+first_file="${file_array[0]}"
+
+for ((i=1; i<${#file_array[@]}; i++)); do
+    output_file="cross$((i)).bed"
+    input_file="${file_array[i]}"
+    bedtools intersect -a "$first_file" -b "$input_file" > "$output_file"
+    first_file="$output_file"
+done
+
+chmod +x common_peak_nextstep.sh
+./common_peak_nextstep.sh 
+1HIPP_cortex_0.5.bed 2HIPP_PFC_0.5.bed 3HIPP_CERE_0.5.bed 4HIPP_STR_0.5.bed 5HIPP_DG_0.5.bed 6HIPP_OLF_0.5.bed 7HIPP_SEN_0.5.bed 8cortex_PFC_0.5.bed 9cortex_CERE_0.5.bed 10cortex_STR_0.5.bed 11cortex_DG_0.5.bed 12cortex_OLF_0.5.bed 13cortex_SEN_0.5.bed 14PFC_CERE_0.5.bed 15PFC_STR_0.5.bed 16PFC_DG_0.5.bed 17PFC_OLF_0.5.bed 18PFC_SEN_0.5.bed 19CERE_STR_0.5.bed 20CERE_DG_0.5.bed 21CERE_OLF_0.5.bed 22CERE_SEN_0.5.bed 23STR_DG_0.5.bed 24STR_OLF_0.5.bed 25STR_SEN_0.5.bed 26DG_OLF_0.5.bed 27DG_SEN_0.5.bed 28OLF_SEN_0.5.bed
+
+# 结果 3587 cross27.bed
+```
+③ 回比到原有peak集
+
+```bash
+ls *_pool_merge.bed | while read id 
+do
+bedtools intersect -wa -u -a ${id} -b cross27.bed -sorted > ${id%%.*}_commonpeak.bed
+done
+# 3587  *_pool_merge_commonpeak.bed 
+# 都是一一对应的关系
 ```
 
+④ 富集分析
+```bash
+mkdir -p /mnt/d/ATAC_brain/mouse/common_0.5
+cp /mnt/xuruizhi/ATAC_brain/mouse/common_0.5/cross27.bed /mnt/d/ATAC_brain/mouse/common_0.5
+mv cross27.bed common.bed
+```
+```r
+library(biomaRt)
+library(ChIPseeker)
+library(GenomicFeatures)
+library(TxDb.Mmusculus.UCSC.mm10.knownGene)
+library(org.Mm.eg.db)
+library(clusterProfiler)
 
 
+region <- c("common")
+
+region_peak <- readPeakFile(paste0("D:/ATAC_brain/mouse/GO_totaldiff7/", region, "_totaldiff.bed"), sep = "")
+
+  png(paste0(region, "_covplot.png"))
+  covplot(region_peak)
+  dev.off()
+
+  txdb <- TxDb.Mmusculus.UCSC.mm10.knownGene
+  promoter <- getPromoters(TxDb = txdb, upstream = 1000, downstream = 1000)
+  tagMatrix <- getTagMatrix(region_peak, windows = promoter)
+  png(paste0(region, "_promoter.png"))
+  tagHeatmap(tagMatrix, xlim = c(-1000, 1000), color = "red")
+  dev.off()
+
+
+  png(paste0(region, "_avg_prof_plot.png"))
+  plotAvgProf(
+    tagMatrix,
+    xlim = c(-1000, 1000),
+    xlab = "Genomic Region (5'->3')",
+    ylab = "Peak Frequency"
+  )
+  dev.off()
+
+  region_peakAnnolist <- annotatePeak(
+    region_peak,
+    tssRegion = c(-1000, 1000),
+    TxDb = txdb,
+    annoDb = "org.Mm.eg.db"
+  )
+  write.table(
+    as.data.frame(region_peakAnnolist),
+    file = paste0(region, "_allpeak.annotation.tsv"),
+    sep = "\t",
+    row.names = FALSE,
+    quote = FALSE
+  )
+
+  png(paste0(region, "_plotAnnoPie.png"))
+  plotAnnoPie(region_peakAnnolist)
+  dev.off()
+
+  region_peakAnno <- as.data.frame(region_peakAnnolist)
+
+  ensembl_id_transform <- function(ENSEMBL_ID) {
+    a = bitr(ENSEMBL_ID, fromType = "ENSEMBL", toType = c("SYMBOL", "ENTREZID"), OrgDb = "org.Mm.eg.db")
+    return(a)
+  }
+  region_ensembl_id_transform <- ensembl_id_transform(region_peakAnno$ENSEMBL)
+  write.csv(ensembl_id_transform(region_peakAnno$ENSEMBL), file = paste0(region, "_allpeak_geneID.tsv"), quote = FALSE)
+
+  mart <- useDataset("mmusculus_gene_ensembl", useMart("ENSEMBL_MART_ENSEMBL"))
+  region_biomart_ensembl_id_transform <- getBM(
+    attributes = c("ensembl_gene_id", "external_gene_name", "entrezgene_id", "description"),
+    filters = "ensembl_gene_id",
+    values = region_peakAnno$ENSEMBL,
+    mart = mart
+  )
+  write.csv(region_biomart_ensembl_id_transform, file = paste0(region, "_allpeak_biomart_geneID.tsv"), quote = FALSE)
+
+  # GO analysis and barplot
+  region_biomart <- enrichGO(
+    gene = region_biomart_ensembl_id_transform$entrezgene_id, 
+    keyType = "ENTREZID",
+    OrgDb = org.Mm.eg.db,
+    ont = "BP",
+    pAdjustMethod = "BH",
+    qvalueCutoff = 0.05,
+    readable = TRUE
+  )
+  pdf(file = paste0(region, "_biomart.pdf"))
+  barplot(region_biomart, showCategory = 40, font.size = 6, title = paste("The GO BP enrichment analysis", sep = ""))
+  dev.off()
+
+  region_transform <- enrichGO(
+    gene = region_ensembl_id_transform$ENTREZID, 
+    keyType = "ENTREZID",
+    OrgDb = org.Mm.eg.db,
+    ont = "BP",
+    pAdjustMethod = "BH",
+    qvalueCutoff = 0.05,
+    readable = TRUE
+  )
+  pdf(file = paste0(region, "_transform.pdf"))
+  barplot(region_transform, showCategory = 40, font.size = 6, title = paste("The GO BP enrichment analysis", sep = ""))
+  dev.off()
+
+  region_kegg <- enrichKEGG(
+    gene = region_ensembl_id_transform$ENTREZID,
+    organism = 'mmu',
+    pvalueCutoff = 0.05,
+    pAdjustMethod = "BH"
+  )
+  pdf(file = paste0(region, "_kegg.pdf"),width = 80, height = 120)
+  barplot(region_kegg, showCategory = 20, font.size = 120,title = "KEGG Pathway Enrichment Analysis")
+  dev.off()
+```
 
 
 
