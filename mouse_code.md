@@ -2482,42 +2482,22 @@ region_peak <- readPeakFile(paste0("D:/ATAC_brain/mouse/GO_totaldiff7/", region,
 ```
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 # 11. 每个脑区共有peak
 
-还没有做该部分
 ```bash
 # 以HIPP为主
 bedtools intersect -wa -u -a HIPP_pool_merge.bed -b PFC_pool_merge.bed cortex_pool_merge.bed -sorted 
 ```
-## 10.4 A,B,C重叠并取原来的peak，交集再交集 ————以此为准
+## A,B,C...重叠并取原来的peak，交集再交集 ————以此为准
 
-只取a&b，a&c，b&c相交长度占总长的50%以上的部分，再取交集，看此交集对应的peak原位置  
+只取八个脑区两两相交的相交长度占总长的50%以上的部分，再取交集，看此交集对应的peak原位置  
 
 ```bash
 # 建目录
-mkdir -p /mnt/xuruizhi/brain/common_peak_final/0.5/mouse
-mkdir -p /mnt/xuruizhi/brain/common_peak_final/0.8/mouse
-mkdir -p /mnt/xuruizhi/brain/common_peak_final/0.9/mouse
+mkdir -p /mnt/xuruizhi/ATAC_brain/mouse/common_0.5
 
-cd /mnt/xuruizhi/brain/IDR_final/mouse
-cp ./*_pool_merge.bed /mnt/xuruizhi/brain/common_peak_final/0.5/mouse
-cp ./*_pool_merge.bed /mnt/xuruizhi/brain/common_peak_final/0.8/mouse
-cp ./*_pool_merge.bed /mnt/xuruizhi/brain/common_peak_final/0.9/mouse
+cd /mnt/xuruizhi/ATAC_brain/mouse/IDR
+cp ./*_pool_merge.bed /mnt/xuruizhi/ATAC_brain/mouse/common_0.5/
 
 # 将间隔小于50bp的reads合并
 sort -k1,1 -k2,2n HIPP_pool_merge.bed > HIPP.bed
@@ -2526,15 +2506,15 @@ bedtools merge -i HIPP.bed -d 50 > all.bed
 ```
 ① 重叠50% 
 ```bash
-cd /mnt/xuruizhi/brain/common_peak_final/0.5/mouse
-# 只取a&b，a&c，b&c相交长度占总长的50%以上的部分，再取交集，看此交集对应的peak原位置
+cd /mnt/xuruizhi/ATAC_brain/mouse/common_0.5/
+# 只取两两相交长度占总长的50%以上的部分，再取交集，看此交集对应的peak原位置
 ## 计算两两相交占比大于50%的部分
 ## a&b
-bedtools intersect -a HIPP_pool_merge.bed -b PFC_pool_merge.bed -sorted -f 0.5 -r > 1HIPP_PFC_0.5.bed  # 18064 1HIPP_PFC_0.5.bed
+bedtools intersect -a HIPP_pool_merge.bed -b PFC_pool_merge.bed -sorted -f 0.5 -r > 1HIPP_PFC_0.5.bed  #  13063 1HIPP_PFC_0.5.bed
 ## a&c
-bedtools intersect -a HIPP_pool_merge.bed -b cortex_pool_merge.bed -sorted -f 0.5 -r > 2HIPP_cortex_0.5.bed  # 14973 2HIPP_cortex_0.5.bed
+bedtools intersect -a HIPP_pool_merge.bed -b cortex_pool_merge.bed -sorted -f 0.5 -r > 2HIPP_cortex_0.5.bed  # 10927 2HIPP_cortex_0.5.bed
 ## b&c
-bedtools intersect -a cortex_pool_merge.bed -b PFC_pool_merge.bed -sorted -f 0.5 -r > 3cortex_PFC_0.5.bed  # 35612 3cortex_PFC_0.5.bed
+bedtools intersect -a cortex_pool_merge.bed -b PFC_pool_merge.bed -sorted -f 0.5 -r > 3cortex_PFC_0.5.bed  # 36049 3cortex_PFC_0.5.bed
 
 
 # 算出三个部分相交的小块，再看此交集对应的peak原位置
@@ -2557,6 +2537,37 @@ bedtools intersect -wa -u -a cortex_pool_merge.bed -b 5_123_0.5.bed -sorted > 8c
 mkdir -p /mnt/d/brain/brain/common_peak_final/0.5/mouse
 cp /mnt/xuruizhi/brain/common_peak_final/0.5/mouse/* /mnt/d/brain/brain/common_peak_final/0.5/mouse
 ```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
