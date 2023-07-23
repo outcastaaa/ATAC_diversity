@@ -2484,11 +2484,7 @@ region_peak <- readPeakFile(paste0("D:/ATAC_brain/mouse/GO_totaldiff7/", region,
 
 # 11. 每个脑区共有peak
 
-```bash
-# 以HIPP为主
-bedtools intersect -wa -u -a HIPP_pool_merge.bed -b PFC_pool_merge.bed cortex_pool_merge.bed -sorted 
-```
-## A,B,C...重叠并取原来的peak，交集再交集 ————以此为准
+## 重叠50%:A,B,C...重叠并取原来的peak，交集再交集 ————以此为准
 
 只取八个脑区两两相交的相交长度占总长的50%以上的部分，再取交集，看此交集对应的peak原位置  
 
@@ -2504,7 +2500,7 @@ sort -k1,1 -k2,2n HIPP_pool_merge.bed > HIPP.bed
 bedtools merge -i HIPP.bed -d 50 > all.bed
 # 发现数目一样，还是使用HIPP_pool_merge.bed,其他也一样
 ```
-① 重叠50% 
+① 单行代码检验
 ```bash
 cd /mnt/xuruizhi/ATAC_brain/mouse/common_0.5/
 # 只取两两相交长度占总长的50%以上的部分，再取交集，看此交集对应的peak原位置
@@ -2515,6 +2511,7 @@ bedtools intersect -a HIPP_pool_merge.bed -b PFC_pool_merge.bed -sorted -f 0.5 -
 bedtools intersect -a HIPP_pool_merge.bed -b cortex_pool_merge.bed -sorted -f 0.5 -r > 2HIPP_cortex_0.5.bed  # 10927 2HIPP_cortex_0.5.bed
 ## b&c
 bedtools intersect -a cortex_pool_merge.bed -b PFC_pool_merge.bed -sorted -f 0.5 -r > 3cortex_PFC_0.5.bed  # 36049 3cortex_PFC_0.5.bed
+
 
 
 # 算出三个部分相交的小块，再看此交集对应的peak原位置
@@ -2537,7 +2534,42 @@ bedtools intersect -wa -u -a cortex_pool_merge.bed -b 5_123_0.5.bed -sorted > 8c
 mkdir -p /mnt/d/brain/brain/common_peak_final/0.5/mouse
 cp /mnt/xuruizhi/brain/common_peak_final/0.5/mouse/* /mnt/d/brain/brain/common_peak_final/0.5/mouse
 ```
+② 循环
+```bash
+vim common_peak_0.5.sh
+#!/bin/bash
 
+if [ -z "$1" ]; then
+  echo "请提供文件列表作为参数！"
+  exit 1
+fi
+
+file_list_path="$1"
+
+file_list=$(cat "$file_list_path")
+
+IFS=$' \n' read -ra file_array <<< "$file_list"
+
+count=1
+
+for sample_a in "${file_array[@]}"; do
+    for sample_b in "${file_array[@]}"; do
+        if [ "$sample_a" != "$sample_b" ]; then
+            output_file="${count}$(basename "$sample_a")_$(basename "$sample_b")_0.5.bed"
+            ((count++))
+            bedtools intersect -a "$sample_a" -b "$sample_b" -sorted -f 0.5 -r > "$output_file"
+        fi
+    done
+done
+
+chmod +x  common_peak_0.5.sh
+vim file.list
+HIPP_pool_merge.bed
+cortex_pool_merge.bed
+PFC_pool_merge.bed
+
+bash common_peak_0.5.sh file.list
+```
 
 
 
