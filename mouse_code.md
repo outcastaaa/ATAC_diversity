@@ -2633,10 +2633,9 @@ library(TxDb.Mmusculus.UCSC.mm10.knownGene)
 library(org.Mm.eg.db)
 library(clusterProfiler)
 
-
+setwd("D:/ATAC_brain/mouse/common_0.5")
 region <- c("common")
-
-region_peak <- readPeakFile(paste0("D:/ATAC_brain/mouse/GO_totaldiff7/", region, "_totaldiff.bed"), sep = "")
+region_peak <- readPeakFile(paste0("./", region, ".bed"), sep = "")
 
   png(paste0(region, "_covplot.png"))
   covplot(region_peak)
