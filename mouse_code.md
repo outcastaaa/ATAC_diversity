@@ -2778,10 +2778,10 @@ mkdir -p /mnt/xuruizhi/RNA_brain/mouse/sra
 cd /mnt/xuruizhi/RNA_brain/mouse
 vim MOUSE.list 
 SRR14494965 PFC.
-SRR14494966 PFC.
-SRR14494968 PFC.
-SRR14494970 PFC.
-SRR14494971 PFC.
+SRR14494966 PFC. 质控不合格
+SRR14494968 PFC. 质控不合格
+SRR14494970 PFC. 质控不合格
+SRR14494971 PFC. 质控不合格
 SRR14494974 PFC.
 SRR3595255 DG.
 SRR3595256 DG.
@@ -2792,7 +2792,8 @@ SRR11179787 HIPP.
 SRR13443447 PUT.
 SRR13443448 MOB.
 SRR13443449 SEN.
- 
+
+# 与RNA-seq对应：HIPP,DG,PFC,SEN 
 
 cd ./sra
 cp /mnt/d/perl/perl_scripts/download_srr.pl ./
@@ -3105,9 +3106,217 @@ for(i in seq(2, length(id_list))){
 
 write.csv(data_merge, "merge.csv", quote = FALSE, row.names = FALSE)
 ```
+## 12.5 差异表达分析
+
+1. 数据筛选
 ```bash
-cd /mnt/d/RNA_brain/mouse/HTseq
-cat merge.csv | grep -E "ENSRNOG00000018630|ENSRNOG00000034254"
+mkdir -p /mnt/xuruizhi/RNA_brain/mouse/Deseq2
+mkdir -p /mnt/d/RNA_brain/mouse/Deseq2
+
+# 与RNA-seq对应：HIPP,DG,PFC,SEN
+vim MOUSE.list 
+SRR14494965 PFC.
+SRR14494974 PFC.
+SRR3595255 DG.
+SRR3595256 DG.
+SRR3595258 DG.
+SRR11179785 HIPP
+SRR11179786 HIPP.
+SRR11179787 HIPP.
+SRR13443447 PUT. 
+SRR13443448 MOB.
+SRR13443449 SEN.
+
+# 因为考虑到后续Deseq2只能对有重复的样本进行分析，因此还是先使用有重复的三个脑区
+cd /mnt/d/RNA_brain/mouse/Deseq2
+vim MOUSE.list 
+SRR14494965
+SRR14494974
+SRR3595255
+SRR3595256
+SRR3595258
+SRR11179785
+SRR11179786
+SRR11179787
+
+while read -r i
+do
+  cp ../HTseq/${i}.count ./
+done < MOUSE.list
+```
+```r
+rm(list=ls())
+setwd("D:/RNA_brain/mouse/Deseq2")
+
+# 得到文件样本编号
+files <- list.files(".", "*.count")
+f_lists <- list()
+for(i in files){
+    prefix = gsub("(_\\w+)?\\.count", "", i, perl=TRUE)
+    f_lists[[prefix]] = i
+}
+
+id_list <- names(f_lists)
+data <- list()
+count <- 0
+for(i in id_list){
+  count <- count + 1
+  a <- read.table(f_lists[[i]], sep="\t", col.names = c("gene_id",i))
+  data[[count]] <- a
+}
+
+# 合并文件
+data_merge <- data[[1]]
+for(i in seq(2, length(id_list))){
+    data_merge <- merge(data_merge, data[[i]],by="gene_id")
+}
+write.csv(data_merge, "merge.csv", quote = FALSE, row.names = FALSE)
+```
+2. 差异分析
+* coldata
+```bash
+cd /mnt/d/RNA_brain/mouse/Deseq2 
+vim coldata.csv
+"ids","state","condition","treatment"
+"SRR14494965","WT","PFC","treatment"
+"SRR14494974","WT","PFC","treatment"
+"SRR3595255","WT","DG","treatment"
+"SRR3595256","WT","DG","treatment"
+"SRR3595258","WT","DG","treatment"
+"SRR11179785","WT","HIPP","treatment"
+"SRR11179786","WT","HIPP","treatment"
+"SRR11179787","WT","HIPP","treatment"
+```
+```r
+BiocManager::install("DESeq2")
+library(DESeq2)
+library(pheatmap)
+library(biomaRt)
+library(org.Mm.eg.db)
+library(clusterProfiler)
+library(ggplot2)
+
+# 导入countdata文件
+dataframe <- read.csv("merge.csv", header=TRUE, row.names = 1)
+countdata <- dataframe[-(1:5),]
+countdata <- countdata[rowSums(countdata) > 0,]
+head(countdata)
+# 导入coltdata文件
+coldata <- read.table("coldata.csv", row.names = 1, header = TRUE, sep = "," ) 
+countdata <- countdata[row.names(coldata)]
+dds <- DESeqDataSetFromMatrix(countData = countdata, colData = coldata, design= ~ condition)
+dds
+# 归一化
+rld <- rlog(dds, blind=FALSE)
+
+# PCA分析 
+# intgroup分组
+pcaData <- plotPCA(rld, intgroup=c("condition"),returnData = T) 
+pcaData <- pcaData[order(pcaData$condition,decreasing=F),]
+table(pcaData$condition)
+# PCA1
+plot(pcaData[,1:2],pch = 19,col= c(rep("red",3),rep("green",3),rep("blue",2)))+ text(pcaData[,1],pcaData[,2],row.names(pcaData),cex=0.75, font = 1)+legend(-30,-5,inset = .02,pt.cex= 1.5,legend = c("DG","HIPP","PFC"), col = c( "red","green","blue"),pch = 19, cex=0.75,bty="n")
+# PCA2
+plotPCA(rld, intgroup="condition") + ylim(-30, 30)+text(pcaData[,1],pcaData[,2],row.names(pcaData),cex=0.5, font = 1)
+
+# 聚类热图
+library("RColorBrewer")
+# 得到数据对象中基因的计数的转化值
+gene_data_transform <- assay(rld)
+# 使用dist方法求样本之间的距离
+sampleDists <- dist(t(gene_data_transform))
+# 转化为矩阵用于后续pheatmap()方法的输入
+sampleDistMatrix <- as.matrix(sampleDists)
+# 将矩阵的名称进行修改
+rownames(sampleDistMatrix) <- rld$condition
+colnames(sampleDistMatrix) <- rld$condition
+# 设置色盘
+colors <- colorRampPalette(rev(brewer.pal(8, "Blues")) )(255)
+# 绘制热图与聚类
+pheatmap(sampleDistMatrix,
+         clustering_distance_rows=sampleDists,
+         clustering_distance_cols=sampleDists,
+         col=colors)
+
+
+dds$condition <- factor(as.vector(dds$condition), levels = c("DG","HIPP","PFC")) 
+dds$condition
+dds <- DESeq(dds)
+resultsNames(dds) 
+# [1] "Intercept"            "condition_HIPP_vs_DG"
+# [3] "condition_PFC_vs_DG"
+```
+
+
+
+* HIPP vs DG 
+```r
+result <- results(dds, name="condition_HIPP_vs_DG", pAdjustMethod = "fdr", alpha = 0.05)
+result_order <- result[order(result$pvalue),]
+summary(result_order)
+# out of 26613 with nonzero total read count
+# adjusted p-value < 0.05
+# LFC > 0 (up)       : 4287, 16%
+# LFC < 0 (down)     : 5070, 19%
+# outliers [1]       : 15, 0.056%
+# low counts [2]     : 6192, 23%
+# (mean count < 2)
+
+table(result_order$padj<0.05)
+# FALSE  TRUE 
+# 11049  9357
+write.csv(result_order, file="HIPP_vs_DG.csv", quote = F)
+
+# 火山图
+voldata <- read.csv("HIPP_vs_DG.csv", header=TRUE, row.names = 1)
+voldata$plog <- (-log10(voldata$padj))
+voldata$compare <- ifelse(abs(voldata$log2FoldChange) >1 & voldata$padj < 0.05, ifelse(voldata$log2FoldChange >1, "up","down"), "no")
+ggplot(voldata, aes(x=log2FoldChange, y=plog,color= compare)) +
+  geom_point(alpha=.5) +
+  theme(panel.grid.major = element_blank(),
+        axis.ticks.x = element_line(size=1),
+        axis.text.x = element_text(angle=30, hjust=1, vjust=1),
+        axis.title.x=element_text(face="italic", colour="darkred", size=14), # 字体
+        axis.line = element_line(color="black"),
+        plot.title = element_text(colour="red", size=8, face="bold")) +
+  ylab("-log10(padj)") + 
+  xlab("log2FC") +
+  ggtitle("differencial genes") +
+  geom_hline(yintercept = 1) +
+  geom_vline(xintercept = -1:1) + 
+  scale_color_manual(values = c("blue", "grey", "red"))
+
+
+# padj 小于 0.05 并且 Log2FC 大于 1（2倍） 或者小于 -1（1/2倍）
+diff_gene <- subset(result_order, padj < 0.05 & abs(log2FoldChange) > 1)
+# 查看数据框的大小
+dim(diff_gene)   #3585    6
+write.csv(diff_gene, file="diff_HIPP_DG.csv", quote = F)
+# MA图
+plotMA(result_order,ylim=c(-12,12))
+```
+
+
+
+
+* PFC_vs_DG
+```r
+result <- results(dds, name="condition_PFC_vs_DG", pAdjustMethod = "fdr", alpha = 0.05)
+result_order <- result[order(result$pvalue),]
+summary(result_order)
+# out of 26613 with nonzero total read count
+# adjusted p-value < 0.05
+# LFC > 0 (up)       : 7127, 27%
+# LFC < 0 (down)     : 6635, 25%
+# outliers [1]       : 15, 0.056%
+# low counts [2]     : 6192, 23%
+# (mean count < 2)
+
+table(result_order$padj<0.05)
+# FALSE  TRUE 
+#  6644 13762
+write.csv(result_order, file="PFC_vs_DG.csv", quote = F)
+plotMA(result_order,ylim=c(-12,12))
 ```
 
 
