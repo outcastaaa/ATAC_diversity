@@ -2482,6 +2482,170 @@ region_peak <- readPeakFile(paste0("D:/ATAC_brain/mouse/GO_totaldiff7/", region,
 ```
 
 
+# 10.8 三个脑区：与RNA-seq有重复对应
+
+脑区：HIPP,DG,PFC       
+
+1. total diff peaks 
+```bash
+mkdir -p /mnt/xuruizhi/ATAC_brain/mouse/diff_peak8
+cp /mnt/xuruizhi/ATAC_brain/mouse/IDR/*_pool_merge.bed  /mnt/xuruizhi/ATAC_brain/mouse/diff_peak8
+cd /mnt/xuruizhi/ATAC_brain/mouse/diff_peak8
+rm STR_pool_merge.bed OLF_pool_merge.bed CERE_pool_merge.bed cortex_pool_merge.bed SEN_pool_merge.bed
+ 
+vim files.list
+DG_pool_merge.bed
+PFC_pool_merge.bed
+HIPP_pool_merge.bed
+
+
+cat files.list | bash totaldiff_peaks.sh
+``` 
+2. 结果
+```bash
+find . -type f -name "*_pool_merge_totaldiff.bed" -exec sh -c 'mv "$0" "${0%_pool_merge_totaldiff.bed}_totaldiff.bed"' {} \;
+
+wc -l *  
+#   21918 DG_pool_merge.bed
+#    2151 DG_totaldiff.bed
+#   14720 HIPP_pool_merge.bed
+#       4 HIPP_totaldiff.bed
+#   91720 PFC_pool_merge.bed
+#    5745 PFC_totaldiff.bed
+#  181048 SEN_pool_merge.bed
+#   78354 SEN_totaldiff.bed
+
+mkdir -p /mnt/d/ATAC_brain/mouse/GO_totaldiff7
+cp /mnt/xuruizhi/ATAC_brain/mouse/diff_peak7/*_totaldiff.bed /mnt/d/ATAC_brain/mouse/GO_totaldiff7
+```  
+3. 富集分析
+```r
+library(biomaRt)
+library(ChIPseeker)
+library(GenomicFeatures)
+library(TxDb.Mmusculus.UCSC.mm10.knownGene)
+library(org.Mm.eg.db)
+library(clusterProfiler)
+
+# regions <- c("CERE","DG","OLF","PFC","SEN","STR","HIPP","cortex")
+region <- c("DG")
+region <- c("HIPP")
+region <- c("PFC")
+region <- c("SEN")
+
+region_peak <- readPeakFile(paste0("D:/ATAC_brain/mouse/GO_totaldiff7/", region, "_totaldiff.bed"), sep = "")
+
+  png(paste0(region, "_covplot.png"))
+  covplot(region_peak)
+  dev.off()
+
+  txdb <- TxDb.Mmusculus.UCSC.mm10.knownGene
+  promoter <- getPromoters(TxDb = txdb, upstream = 1000, downstream = 1000)
+  tagMatrix <- getTagMatrix(region_peak, windows = promoter)
+  png(paste0(region, "_promoter.png"))
+  tagHeatmap(tagMatrix, xlim = c(-1000, 1000), color = "red")
+  dev.off()
+
+
+  png(paste0(region, "_avg_prof_plot.png"))
+  plotAvgProf(
+    tagMatrix,
+    xlim = c(-1000, 1000),
+    xlab = "Genomic Region (5'->3')",
+    ylab = "Peak Frequency"
+  )
+  dev.off()
+
+  region_peakAnnolist <- annotatePeak(
+    region_peak,
+    tssRegion = c(-1000, 1000),
+    TxDb = txdb,
+    annoDb = "org.Mm.eg.db"
+  )
+  write.table(
+    as.data.frame(region_peakAnnolist),
+    file = paste0(region, "_allpeak.annotation.tsv"),
+    sep = "\t",
+    row.names = FALSE,
+    quote = FALSE
+  )
+
+  png(paste0(region, "_plotAnnoPie.png"))
+  plotAnnoPie(region_peakAnnolist)
+  dev.off()
+
+  region_peakAnno <- as.data.frame(region_peakAnnolist)
+
+  ensembl_id_transform <- function(ENSEMBL_ID) {
+    a = bitr(ENSEMBL_ID, fromType = "ENSEMBL", toType = c("SYMBOL", "ENTREZID"), OrgDb = "org.Mm.eg.db")
+    return(a)
+  }
+  region_ensembl_id_transform <- ensembl_id_transform(region_peakAnno$ENSEMBL)
+  write.csv(ensembl_id_transform(region_peakAnno$ENSEMBL), file = paste0(region, "_allpeak_geneID.tsv"), quote = FALSE)
+
+  mart <- useDataset("mmusculus_gene_ensembl", useMart("ENSEMBL_MART_ENSEMBL"))
+  region_biomart_ensembl_id_transform <- getBM(
+    attributes = c("ensembl_gene_id", "external_gene_name", "entrezgene_id", "description"),
+    filters = "ensembl_gene_id",
+    values = region_peakAnno$ENSEMBL,
+    mart = mart
+  )
+  write.csv(region_biomart_ensembl_id_transform, file = paste0(region, "_allpeak_biomart_geneID.tsv"), quote = FALSE)
+
+  # GO analysis and barplot
+  region_biomart <- enrichGO(
+    gene = region_biomart_ensembl_id_transform$entrezgene_id, 
+    keyType = "ENTREZID",
+    OrgDb = org.Mm.eg.db,
+    ont = "BP",
+    pAdjustMethod = "BH",
+    qvalueCutoff = 0.05,
+    readable = TRUE
+  )
+  pdf(file = paste0(region, "_biomart.pdf"))
+  barplot(region_biomart, showCategory = 40, font.size = 6, title = paste("The GO BP enrichment analysis", sep = ""))
+  dev.off()
+
+  region_transform <- enrichGO(
+    gene = region_ensembl_id_transform$ENTREZID, 
+    keyType = "ENTREZID",
+    OrgDb = org.Mm.eg.db,
+    ont = "BP",
+    pAdjustMethod = "BH",
+    qvalueCutoff = 0.05,
+    readable = TRUE
+  )
+  pdf(file = paste0(region, "_transform.pdf"))
+  barplot(region_transform, showCategory = 40, font.size = 6, title = paste("The GO BP enrichment analysis", sep = ""))
+  dev.off()
+
+  region_kegg <- enrichKEGG(
+    gene = region_ensembl_id_transform$ENTREZID,
+    organism = 'mmu',
+    pvalueCutoff = 0.05,
+    pAdjustMethod = "BH"
+  )
+  pdf(file = paste0(region, "_kegg.pdf"),width = 80, height = 120)
+  barplot(region_kegg, showCategory = 20, font.size = 120,title = "KEGG Pathway Enrichment Analysis")
+  dev.off()
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 # 11. 每个脑区共有peak
 
 ## 重叠50%:A,B,C...重叠并取原来的peak，交集再交集 ————以此为准
@@ -3172,7 +3336,7 @@ for(i in seq(2, length(id_list))){
 }
 write.csv(data_merge, "merge.csv", quote = FALSE, row.names = FALSE)
 ```
-2. 差异分析
+2. 差异分析，以DG为control
 * coldata
 ```bash
 cd /mnt/d/RNA_brain/mouse/Deseq2 
@@ -3285,15 +3449,16 @@ ggplot(voldata, aes(x=log2FoldChange, y=plog,color= compare)) +
   geom_hline(yintercept = 1) +
   geom_vline(xintercept = -1:1) + 
   scale_color_manual(values = c("blue", "grey", "red"))
-
+# MA图  
+png("MA_HIPP_DG.png")
+plotMA(result_order,ylim=c(-12,12))
+dev.off()
 
 # padj 小于 0.05 并且 Log2FC 大于 1（2倍） 或者小于 -1（1/2倍）
 diff_gene <- subset(result_order, padj < 0.05 & abs(log2FoldChange) > 1)
 # 查看数据框的大小
 dim(diff_gene)   #3585    6
 write.csv(diff_gene, file="diff_HIPP_DG.csv", quote = F)
-# MA图
-plotMA(result_order,ylim=c(-12,12))
 ```
 
 
@@ -3315,14 +3480,299 @@ summary(result_order)
 table(result_order$padj<0.05)
 # FALSE  TRUE 
 #  6644 13762
+
 write.csv(result_order, file="PFC_vs_DG.csv", quote = F)
+png("MA_PFC_DG.png")
 plotMA(result_order,ylim=c(-12,12))
+dev.off()
+
+diff_gene <- subset(result_order, padj < 0.05 & abs(log2FoldChange) > 1)
+dim(diff_gene)   #10617    6
+write.csv(diff_gene, file="diff_PFC_DG.csv", quote = F)
+```
+
+
+2. 差异分析，以HIPP为control
+```r
+library(DESeq2)
+library(pheatmap)
+library(biomaRt)
+library(org.Mm.eg.db)
+library(clusterProfiler)
+library(ggplot2)
+
+# 其他和前文一致
+dds <- DESeqDataSetFromMatrix(countData = countdata, colData = coldata, design= ~ condition)
+dds$condition <- factor(as.vector(dds$condition), levels = c("HIPP","DG","PFC")) 
+dds$condition
+dds <- DESeq(dds)
+resultsNames(dds) 
+# [1] "Intercept"             "condition_DG_vs_HIPP"  "condition_PFC_vs_HIPP"
 ```
 
 
 
+* DG_vs_HIPP
+```r
+result <- results(dds, name="condition_DG_vs_HIPP", pAdjustMethod = "fdr", alpha = 0.05)
+result_order <- result[order(result$pvalue),]
+summary(result_order) # 和前文HIPP vs DG刚好反过来
+# out of 26613 with nonzero total read count
+# adjusted p-value < 0.05
+# LFC > 0 (up)       : 5070, 19%
+# LFC < 0 (down)     : 4287, 16%
+# outliers [1]       : 15, 0.056%
+# low counts [2]     : 6192, 23%
+# (mean count < 2)
+
+table(result_order$padj<0.05)
+# FALSE  TRUE 
+# 11049  9357
+write.csv(result_order, file="DG_vs_HIPP.csv", quote = F)
+
+diff_gene <- subset(result_order, padj < 0.05 & abs(log2FoldChange) > 1)
+dim(diff_gene)   #3585    6
+write.csv(diff_gene, file="diff_DG_HIPP.csv", quote = F)
+```
 
 
 
+* PFC_vs_HIPP
+```r
+result <- results(dds, name="condition_PFC_vs_HIPP", pAdjustMethod = "fdr", alpha = 0.05)
+result_order <- result[order(result$pvalue),]
+summary(result_order)
+# out of 26613 with nonzero total read count
+# adjusted p-value < 0.05
+# LFC > 0 (up)       : 6782, 25%
+# LFC < 0 (down)     : 6938, 26%
+# outliers [1]       : 15, 0.056%
+# low counts [2]     : 5676, 21%
+# (mean count < 1)
+
+table(result_order$padj<0.05)
+# FALSE  TRUE 
+#  7202 13720 
+
+write.csv(result_order, file="PFC_vs_HIPP.csv", quote = F)
+png("MA_PFC_HIPP.png")
+plotMA(result_order,ylim=c(-12,12))
+dev.off()
+
+diff_gene <- subset(result_order, padj < 0.05 & abs(log2FoldChange) > 1)
+dim(diff_gene)   #10400    6
+write.csv(diff_gene, file="diff_PFC_HIPP.csv", quote = F)
+```
+
+3. 差异分析，以PFC为control
+```r
+library(DESeq2)
+library(pheatmap)
+library(biomaRt)
+library(org.Mm.eg.db)
+library(clusterProfiler)
+library(ggplot2)
+
+# 其他和前文一致
+dds <- DESeqDataSetFromMatrix(countData = countdata, colData = coldata, design= ~ condition)
+dds$condition <- factor(as.vector(dds$condition), levels = c("PFC","HIPP","DG")) 
+dds$condition
+dds <- DESeq(dds)
+resultsNames(dds) 
+# [1] "Intercept"             "condition_HIPP_vs_PFC" "condition_DG_vs_PFC" 
+```
 
 
+
+* HIPP_vs_PFC
+```r
+result <- results(dds, name="condition_HIPP_vs_PFC", pAdjustMethod = "fdr", alpha = 0.05)
+result_order <- result[order(result$pvalue),]
+summary(result_order) 
+# out of 26613 with nonzero total read count
+# adjusted p-value < 0.05
+# LFC > 0 (up)       : 6938, 26%
+# LFC < 0 (down)     : 6782, 25%
+# outliers [1]       : 15, 0.056%
+# low counts [2]     : 5676, 21%
+# (mean count < 1)
+
+table(result_order$padj<0.05)
+# FALSE  TRUE 
+#  7202 13720 
+write.csv(result_order, file="HIPP_vs_PFC.csv", quote = F)
+
+diff_gene <- subset(result_order, padj < 0.05 & abs(log2FoldChange) > 1)
+dim(diff_gene)   #10400    6
+write.csv(diff_gene, file="diff_HIPP_PFC.csv", quote = F)
+```
+
+
+
+* DG_vs_PFC
+```r
+result <- results(dds, name="condition_DG_vs_PFC", pAdjustMethod = "fdr", alpha = 0.05)
+result_order <- result[order(result$pvalue),]
+summary(result_order)
+# out of 26613 with nonzero total read count
+# adjusted p-value < 0.05
+# LFC > 0 (up)       : 6635, 25%
+# LFC < 0 (down)     : 7127, 27%
+# outliers [1]       : 15, 0.056%
+# low counts [2]     : 6192, 23%
+# (mean count < 2)
+
+table(result_order$padj<0.05)
+# FALSE  TRUE 
+#  6644 13762 
+
+write.csv(result_order, file="DG_vs_PFC.csv", quote = F)
+
+diff_gene <- subset(result_order, padj < 0.05 & abs(log2FoldChange) > 1)
+dim(diff_gene)   # 10617    6
+write.csv(diff_gene, file="diff_DG_PFC.csv", quote = F)
+```
+
+
+4. 脑区差异基因
+
+找到某一脑区对另外两个脑区来说，都差异表达的基因。
+
+```bash
+cd /mnt/d/RNA_brain/mouse/Deseq2 
+# diff_HIPP_DG.csv diff_HIPP_PFC.csv
+
+# 区分up/down
+for i in *.csv
+do
+sed 's/,/\t/g' "$i" | tail -n +2  > "${i%.csv}.txt"
+done
+dos2unix *.txt
+
+for i in diff*.txt 
+do
+  echo " ==> $i <== " 
+  tsv-filter --is-numeric 3 --gt 3:0 $i > ${i%%.*}_up.txt
+  tsv-filter --is-numeric 3 --lt 3:0 $i > ${i%%.*}_down.txt
+done
+
+wc -l *_up.txt
+   1114 diff_DG_HIPP_up.txt
+   5077 diff_DG_PFC_up.txt
+   2471 diff_HIPP_DG_up.txt
+   5348 diff_HIPP_PFC_up.txt
+   5540 diff_PFC_DG_up.txt
+   5052 diff_PFC_HIPP_up.txt
+
+wc -l *_down.txt
+   2471 diff_DG_HIPP_down.txt
+   5540 diff_DG_PFC_down.txt
+   1114 diff_HIPP_DG_down.txt
+   5052 diff_HIPP_PFC_down.txt
+   5077 diff_PFC_DG_down.txt
+   5348 diff_PFC_HIPP_down.txt
+```
+
+* HIPP对于其他两个脑区的差异基因
+```bash
+# up
+awk 'NR==FNR {a[$1]=1; next} a[$1]' diff_HIPP_DG_up.txt diff_HIPP_PFC_up.txt > diff_HIPP_up.txt # 932
+# down
+awk 'NR==FNR {a[$1]=1; next} a[$1]' diff_HIPP_DG_down.txt diff_HIPP_PFC_down.txt > diff_HIPP_down.txt # 397
+
+cat diff_HIPP_up.txt diff_HIPP_down.txt > diff_HIPP.txt
+```
+```r
+library(biomaRt)
+library(ChIPseeker)
+library(GenomicFeatures)
+library(TxDb.Mmusculus.UCSC.mm10.knownGene)
+library(org.Mm.eg.db)
+library(clusterProfiler)
+
+
+  setwd("D:/RNA_brain/mouse/Deseq2")
+  region <- c("HIPP")
+  data <- read.table(paste0("diff_",region,".txt"), header=FALSE)
+  
+  ensembl_id_transform <- function(ENSEMBL_ID) {
+    a = bitr(ENSEMBL_ID, fromType = "ENSEMBL", toType = c("SYMBOL", "ENTREZID"), OrgDb = "org.Mm.eg.db")
+    return(a)
+  }
+  region_ensembl_id_transform <- ensembl_id_transform(data$V1)
+  write.csv(ensembl_id_transform(data$V1), file =  paste0("diff_",region,"_ensemblID.tsv"))
+
+  mart <- useDataset("mmusculus_gene_ensembl", useMart("ENSEMBL_MART_ENSEMBL"))
+  region_biomart_ensembl_id_transform <- getBM(
+    attributes = c("ensembl_gene_id", "external_gene_name", "entrezgene_id", "description"),
+    filters = "ensembl_gene_id",
+    values = data$V1,
+    mart = mart
+  )
+  write.csv(region_biomart_ensembl_id_transform, file =  paste0("diff_",region,"_biomartID.tsv"))
+
+  # GO analysis and barplot
+  region_biomart <- enrichGO(
+    gene = region_biomart_ensembl_id_transform$entrezgene_id, 
+    keyType = "ENTREZID",
+    OrgDb = org.Mm.eg.db,
+    ont = "BP",
+    pAdjustMethod = "BH",
+    qvalueCutoff = 0.05,
+    readable = TRUE
+  )
+  pdf(file = paste0(region, "_biomart.pdf"))
+  barplot(region_biomart, showCategory = 40, font.size = 6, title = paste("The GO BP enrichment analysis", sep = ""))
+  dev.off()
+
+  region_transform <- enrichGO(
+    gene = region_ensembl_id_transform$ENTREZID, 
+    keyType = "ENTREZID",
+    OrgDb = org.Mm.eg.db,
+    ont = "BP",
+    pAdjustMethod = "BH",
+    qvalueCutoff = 0.05,
+    readable = TRUE
+  )
+  pdf(file = paste0(region, "_transform.pdf"))
+  barplot(region_transform, showCategory = 40, font.size = 6, title = paste("The GO BP enrichment analysis", sep = ""))
+  dev.off()
+
+  region_kegg <- enrichKEGG(
+    gene = region_ensembl_id_transform$ENTREZID,
+    organism = 'mmu',
+    pvalueCutoff = 0.05,
+    pAdjustMethod = "BH"
+  )
+  pdf(file = paste0(region, "_kegg.pdf"),width = 80, height = 120)
+  barplot(region_kegg, showCategory = 20, font.size = 120,title = "KEGG Pathway Enrichment Analysis")
+  dev.off()
+```
+
+* DG 对于其他两个脑区的差异基因
+```bash
+# up
+awk 'NR==FNR {a[$1]=1; next} a[$1]' diff_DG_HIPP_up.txt diff_DG_PFC_up.txt > diff_DG_up.txt # 597
+# down
+awk 'NR==FNR {a[$1]=1; next} a[$1]' diff_DG_HIPP_down.txt diff_DG_PFC_down.txt > diff_DG_down.txt # 1363
+
+cat diff_DG_up.txt diff_DG_down.txt > diff_DG.txt
+```
+```r
+  region <- c("DG")
+  data <- read.table(paste0("diff_",region,".txt"), header=FALSE)
+```
+
+* PFC 对于其他两个脑区的差异基因
+```bash
+# up
+awk 'NR==FNR {a[$1]=1; next} a[$1]' diff_PFC_DG_up.txt diff_PFC_HIPP_up.txt > diff_PFC_up.txt # 4070
+# down
+awk 'NR==FNR {a[$1]=1; next} a[$1]' diff_PFC_DG_down.txt diff_PFC_HIPP_down.txt > diff_PFC_down.txt # 4154
+
+cat diff_PFC_up.txt diff_PFC_down.txt > diff_PFC.txt
+```
+```r
+  region <- c("PFC")
+  data <- read.table(paste0("diff_",region,".txt"), header=FALSE)
+```

@@ -1,6 +1,5 @@
 #!/bin/bash
 # this script is to genrate total diff peaks.
-# PFC,STR,DG,OLF,SEN,CERE
 
 
 # 从标准输入中读取文件列表
