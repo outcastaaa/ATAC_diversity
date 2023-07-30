@@ -3672,3 +3672,6 @@ cat diff_PFC_up.txt diff_PFC_down.txt > diff_PFC.txt
   region <- c("PFC")
   data <- read.table(paste0("diff_",region,".txt"), header=FALSE)
 ```
+```bash
+cp /mnt/d/RNA_brain/mouse/Deseq2/* /mnt/xuruizhi/RNA_brain/mouse/Deseq2
+```
