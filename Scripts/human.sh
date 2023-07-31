@@ -21,7 +21,6 @@ fastqc -t 6 -o /mnt/xuruizhi/ATAC_brain/human/fastqc_again /mnt/xuruizhi/ATAC_br
 # align
 bowtie2  -p 96 -x /scratch/wangq/xrz/ATAC_brain/human/genome/mm10 --very-sensitive -X 2000 -1 /scratch/wangq/xrz/ATAC_brain/human/trim/{}_1_val_1.fq.gz -2 /scratch/wangq/xrz/ATAC_brain/human/trim/{}_2_val_2.fq.gz -S /scratch/wangq/xrz/ATAC_brain/human/align/{}.sam
 
-
 # sort_transfertobam_index 
 samtools sort -@ 96 /scratch/wangq/xrz/ATAC_brain/human/align/{}.sam > /scratch/wangq/xrz/ATAC_brain/human/sort_bam/{}.sort.bam
 samtools index -@ 96 /scratch/wangq/xrz/ATAC_brain/human/sort_bam/{}.sort.bam
@@ -41,11 +40,8 @@ samtools index -@ 48 /scratch/wangq/xrz/ATAC_brain/human/filter/{}.filter.bam
 samtools flagstat -@ 48 /scratch/wangq/xrz/ATAC_brain/human/filter/{}.filter.bam > /scratch/wangq/xrz/ATAC_brain/human/filter/{}.filter.stat
 
 
-# 本地
+# local
 # rm blklist
-  bedtools intersect -wa -a {}.filter.bam -b ../blklist/mm10.blacklist.bed | \
-  wc -l  > ../blklist/{}.intersect.list
-
 parallel -k -j 6 "
   echo {} 
   echo "{}.filter.bam"

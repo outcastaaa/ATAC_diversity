@@ -3675,3 +3675,19 @@ cat diff_PFC_up.txt diff_PFC_down.txt > diff_PFC.txt
 ```bash
 cp /mnt/d/RNA_brain/mouse/Deseq2/* /mnt/xuruizhi/RNA_brain/mouse/Deseq2
 ```
+
+# 补充
+还有一个单独的小脑数据，因为太大了（20Gb）前面被舍弃，因为此数据含有对应RNA-seq，因此再添加上——SRR14614715。
+```bash
+# 在原来的/mnt/xuruizhi/barin/
+# sra文件已经删除，/mnt/xuruizhi/barin/fastq/mouse文件夹中有fastq格式文件
+# fastqc、fastqc_again质量很好
+# trim文件在/mnt/xuruizhi/barin/trim/mouse文件夹中
+# SRR14614715.sam在超算~/xuruizhi/brain/brain/alignment/mouse/中
+
+bamdir=~/xuruizhi/brain/brain/sort_bam/mouse
+samtools sort -@ 24 SRR14614715.sam > $bamdir/SRR14614715.sort.bam
+samtools index -@ 24 $bamdir/SRR14614715.sort.bam
+samtools flagstat  -@ 24 $bamdir/SRR14614715.sort.bam > $bamdir/SRR14614715.raw.stat
+```
+已经写好了分开bam文件的脚本。

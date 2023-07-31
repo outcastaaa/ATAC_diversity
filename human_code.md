@@ -146,7 +146,7 @@ cat new_HUMAN.list | parallel -k -j 8 "
 cat download.log | grep " downloaded successfully"
 ```
 
-# sra2fa+qc+trim+qc
+# 3. sra2fa+qc+trim+qc
 ```bash
 cd /mnt/xuruizhi/ATAC_brain/human
 mkdir -p sequence
@@ -252,7 +252,7 @@ SRR21163264
 SRR21163311
 SRR21163312
 SRR21163339
-SRR21163340
+SRR21163340.
 SRR21163357
 SRR21163358
 SRR21163371
@@ -280,8 +280,6 @@ fastqc -t 6 -o /mnt/xuruizhi/ATAC_brain/human/fastqc_again /mnt/xuruizhi/ATAC_br
 
 
 
-
-
 # 先做3.list
 cat 3.list | while read id
 do
@@ -294,4 +292,53 @@ cd ../fastqc
 multiqc .
 cd  ../fastqc_again
 multiqc .
+```
+# 4. align_filter
+
+1. genome: 后续用bowtie2比对，在bowtie2官网下载已经建立好的基因组索引文件。   
+```bash
+mkdir -p /mnt/xuruizhi/ATAC_brain/human/genome
+mkdir -p /mnt/d/ATAC_brain/human/genome
+cd /mnt/d/ATAC_brain/human/genome
+wget https://genome-idx.s3.amazonaws.com/bt/GRCh38_noalt_as.zip 
+unzip GRCh38_noalt_as.zip
+
+cp -r ./* /mnt/xuruizhi/ATAC_brain/human/genome/
+```
+2. 批量处理
+```bash
+# 转入超算
+cd /scratch/wangq/xrz/ATAC_brain/human
+mkdir -p align 
+mkdir -p sort_bam
+mkdir -p filter
+mkdir -p rmdup
+mkdir -p blklist
+
+cd align
+cp ../sequence/1.list .
+cp ../sequence/2.list .
+cp ../sequence/3.list .
+
+# align
+vim human.sh
+#!/usr/bin bash
+# This script is for pari-end sequence.
+
+# hpcc
+# align
+bowtie2  -p 96 -x /scratch/wangq/xrz/ATAC_brain/human/genome/GRCh38_noalt_as/GRCh38_noalt_as --very-sensitive -X 2000 -1 /scratch/wangq/xrz/ATAC_brain/human/trim/{}_1_val_1.fq.gz -2 /scratch/wangq/xrz/ATAC_brain/human/trim/{}_2_val_2.fq.gz -S /scratch/wangq/xrz/ATAC_brain/human/align/{}.sam
+
+# sort_transfertobam_index 
+samtools sort -@ 96 /scratch/wangq/xrz/ATAC_brain/human/align/{}.sam > /scratch/wangq/xrz/ATAC_brain/human/sort_bam/{}.sort.bam
+samtools index -@ 96 /scratch/wangq/xrz/ATAC_brain/human/sort_bam/{}.sort.bam
+samtools flagstat  -@ 96 /scratch/wangq/xrz/ATAC_brain/human/sort_bam/{}.sort.bam > /scratch/wangq/xrz/ATAC_brain/human/sort_bam/{}.raw.stat
+
+
+cat 3.list  | while read id
+do 
+  sed "s/{}/${id}/g" human.sh > ${id}_align.sh
+  bsub -q mpi -n 96  "
+  bash  ${id}_align.sh >> ./align.log 2>&1"
+done
 ```
