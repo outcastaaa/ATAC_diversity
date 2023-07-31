@@ -30,7 +30,7 @@ mkdir -p /mnt/xuruizhi/ATAC_brain/human
 # 2. 下载数据
 1. 测序数据
 ```bash
-# human 70个
+# human 68个+26个
 cd /mnt/xuruizhi/ATAC_brain/human
 vim HUMAN.list 
 SRR21163180
@@ -102,6 +102,36 @@ SRR21163368
 SRR21163376
 SRR21163377
 
+# PAC+PVC有必要再下载
+SRR21163168
+SRR21163169
+SRR21163174
+SRR21163175
+SRR21163182
+SRR21163183
+SRR21163192
+SRR21163193
+SRR21163198
+SRR21163199
+SRR21163326
+SRR21163327
+SRR21163328
+SRR21163329
+SRR21163362
+SRR21163363
+
+# HAB +PSC 加上吧
+SRR21163263
+SRR21163264
+SRR21163311
+SRR21163312
+SRR21163339
+SRR21163340
+SRR21163357
+SRR21163358
+SRR21163371
+SRR21163372
+
 
 mkdir -p ./sra
 cd ./sra
@@ -109,9 +139,159 @@ cp /mnt/d/perl/perl_scripts/download_srr.pl ./
 cp /mnt/xuruizhi/ATAC_brain/human/HUMAN.list ./
 
 # 批量下载
-cat HUMAN.list | parallel -k -j 6 "
+cat new_HUMAN.list | parallel -k -j 8 "
   echo {} >> ./download.log
   perl download_srr.pl --output-dir . --srr {} >> ./download.log 2>&1
 "
 cat download.log | grep " downloaded successfully"
+```
+
+# sra2fa+qc+trim+qc
+```bash
+cd /mnt/xuruizhi/ATAC_brain/human
+mkdir -p sequence
+mkdir -p fastqc
+mkdir -p trim
+mkdir -p fastqc_again
+
+cd sequence 
+# 因为磁盘空间不够，分三部分处理
+vim 1.list
+SRR21163180
+SRR21163181
+SRR21163184
+SRR21163185
+SRR21163186
+SRR21163187
+SRR21163190
+SRR21163191
+SRR21163196
+SRR21163197
+SRR21163203
+SRR21163204
+SRR21163207
+SRR21163208
+SRR21163209
+SRR21163210
+SRR21163214
+SRR21163215
+SRR21163216
+SRR21163217
+SRR21163218
+SRR21163219
+SRR21163220
+SRR21163221
+SRR21163226
+SRR21163227
+SRR21163228
+SRR21163229
+SRR21163232
+SRR21163233
+SRR21163234
+SRR21163235
+SRR21163240
+SRR21163241
+SRR21163249
+SRR21163250
+SRR21163254
+SRR21163255
+SRR21163256
+SRR21163257
+SRR21163267
+SRR21163268
+SRR21163293
+SRR21163294
+SRR21163298
+SRR21163299
+SRR21163304
+SRR21163305
+SRR21163320
+SRR21163321
+SRR21163322
+SRR21163323
+SRR21163335
+SRR21163336
+SRR21163337
+SRR21163338
+SRR21163343
+SRR21163344
+SRR21163347
+SRR21163348
+SRR21163349
+SRR21163350
+SRR21163365
+SRR21163366
+SRR21163367
+SRR21163368
+SRR21163376
+SRR21163377
+
+
+vim 2.list
+SRR21163168
+SRR21163169
+SRR21163174
+SRR21163175
+SRR21163182
+SRR21163183
+SRR21163192
+SRR21163193
+SRR21163198
+SRR21163199
+SRR21163326
+SRR21163327
+SRR21163328
+SRR21163329
+SRR21163362
+SRR21163363
+
+
+vim 3.list
+SRR21163263
+SRR21163264
+SRR21163311
+SRR21163312
+SRR21163339
+SRR21163340
+SRR21163357
+SRR21163358
+SRR21163371
+SRR21163372
+
+vim human.sh
+#!/usr/bin bash
+# This script is for pari-end sequence.
+
+
+# local
+# sra2fq.sh
+fastq-dump --gzip --split-3 -O /mnt/xuruizhi/ATAC_brain/human/sequence /mnt/xuruizhi/ATAC_brain/human/sra/{}/{}.sra
+
+# fastqc
+fastqc -t 6 -o /mnt/xuruizhi/ATAC_brain/human/fastqc /mnt/xuruizhi/ATAC_brain/human/sequence/{}_1.fastq.gz
+fastqc -t 6 -o /mnt/xuruizhi/ATAC_brain/human/fastqc /mnt/xuruizhi/ATAC_brain/human/sequence/{}_2.fastq.gz
+
+# trim
+trim_galore --phred33 --length 35 -e 0.1 --stringency 3 --paired -o /mnt/xuruizhi/ATAC_brain/human/trim  {}_1.fastq.gz  {}_2.fastq.gz
+
+# fatsqc_again
+fastqc -t 6 -o /mnt/xuruizhi/ATAC_brain/human/fastqc_again /mnt/xuruizhi/ATAC_brain/human/trim/{}_1_val_1.fq.gz
+fastqc -t 6 -o /mnt/xuruizhi/ATAC_brain/human/fastqc_again /mnt/xuruizhi/ATAC_brain/human/trim/{}_2_val_2.fq.gz
+
+
+
+
+
+# 先做3.list
+cat 3.list | while read id
+do
+  sed "s/{}/${id}/g" human.sh > ${id}_qc_trim.sh
+done
+cat 3.list | parallel --no-run-if-empty --linebuffer -k -j 6 " 
+  bash {}_qc_trim.sh >> ./sra2qc_trim_fastqc.log 2>&1"
+
+cd ../fastqc
+multiqc .
+cd  ../fastqc_again
+multiqc .
 ```
