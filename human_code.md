@@ -252,7 +252,7 @@ SRR21163264
 SRR21163311
 SRR21163312
 SRR21163339
-SRR21163340.
+SRR21163340
 SRR21163357
 SRR21163358
 SRR21163371
@@ -327,18 +327,18 @@ vim human.sh
 
 # hpcc
 # align
-bowtie2  -p 96 -x /scratch/wangq/xrz/ATAC_brain/human/genome/GRCh38_noalt_as/GRCh38_noalt_as --very-sensitive -X 2000 -1 /scratch/wangq/xrz/ATAC_brain/human/trim/{}_1_val_1.fq.gz -2 /scratch/wangq/xrz/ATAC_brain/human/trim/{}_2_val_2.fq.gz -S /scratch/wangq/xrz/ATAC_brain/human/align/{}.sam
+bowtie2  -p 20 -x /scratch/wangq/xrz/ATAC_brain/human/genome/GRCh38_noalt_as/GRCh38_noalt_as --very-sensitive -X 2000 -1 /scratch/wangq/xrz/ATAC_brain/human/trim/{}_1_val_1.fq.gz -2 /scratch/wangq/xrz/ATAC_brain/human/trim/{}_2_val_2.fq.gz -S /scratch/wangq/xrz/ATAC_brain/human/align/{}.sam
 
 # sort_transfertobam_index 
-samtools sort -@ 96 /scratch/wangq/xrz/ATAC_brain/human/align/{}.sam > /scratch/wangq/xrz/ATAC_brain/human/sort_bam/{}.sort.bam
-samtools index -@ 96 /scratch/wangq/xrz/ATAC_brain/human/sort_bam/{}.sort.bam
-samtools flagstat  -@ 96 /scratch/wangq/xrz/ATAC_brain/human/sort_bam/{}.sort.bam > /scratch/wangq/xrz/ATAC_brain/human/sort_bam/{}.raw.stat
+samtools sort -@ 20 /scratch/wangq/xrz/ATAC_brain/human/align/{}.sam > /scratch/wangq/xrz/ATAC_brain/human/sort_bam/{}.sort.bam
+samtools index -@ 8 /scratch/wangq/xrz/ATAC_brain/human/sort_bam/{}.sort.bam
+samtools flagstat  -@ 8 /scratch/wangq/xrz/ATAC_brain/human/sort_bam/{}.sort.bam > /scratch/wangq/xrz/ATAC_brain/human/sort_bam/{}.raw.stat
 
 
 cat 3.list  | while read id
 do 
   sed "s/{}/${id}/g" human.sh > ${id}_align.sh
-  bsub -q mpi -n 96  "
+  bsub -q mpi -n 24  "
   bash  ${id}_align.sh >> ./align.log 2>&1"
 done
 ```
