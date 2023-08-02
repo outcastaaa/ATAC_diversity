@@ -3695,11 +3695,19 @@ samtools flagstat  -@ 24 $bamdir/SRR14614715.sort.bam > $bamdir/SRR14614715.raw.
 
 # 将NAS中文件转移至超算中
 ```bash
-rsync -av /mnt/xuruizhi/brain/sequence wangq@202.119.37.251:/scratch/wangq/xrz/brain/
-# 已经传输完毕
+rsync -avP /mnt/xuruizhi/brain/sequence wangq@202.119.37.251:/scratch/wangq/xrz/brain/
+# brain文件夹已经传输完毕
+rsync -avP /mnt/xuruizhi/RNA_brain/mouse/genome wangq@202.119.37.251:/scratch/wangq/xrz/RNA_brain/mouse
+# RNA_brain文件夹已经传输完毕
+rsync -avP /mnt/xuruizhi/ATAC_brain/mouse/diff_peak* wangq@202.119.37.251:/scratch/wangq/xrz/ATAC_brain/mouse
+rsync -avP /mnt/xuruizhi/ATAC_brain/mouse/rmdup wangq@202.119.37.251:/scratch/wangq/xrz/ATAC_brain/mouse
+# ATAC_brain/mouse文件夹已经传输完毕
+rsync -avP /mnt/xuruizhi/ATAC_brain/human/sra wangq@202.119.37.251:/scratch/wangq/xrz/ATAC_brain/human
 ```
 
 # 将NAS中文件转移至移动硬盘中
 ```bash
-rsync -av /mnt/xuruizhi/brain /mnt/e/BRAIN/
+rsync -avP /mnt/xuruizhi/brain /mnt/e/BRAIN/
+rsync -avP /mnt/xuruizhi/RNA_brain /mnt/e/BRAIN/
+rsync -avP /mnt/xuruizhi/ATAC_brain/mouse /mnt/e/BRAIN/ATAC_brain
 ```

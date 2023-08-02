@@ -280,12 +280,19 @@ fastqc -t 6 -o /mnt/xuruizhi/ATAC_brain/human/fastqc_again /mnt/xuruizhi/ATAC_br
 
 
 
-# 先做3.list
+# 先不做2.list
 cat 3.list | while read id
 do
   sed "s/{}/${id}/g" human.sh > ${id}_qc_trim.sh
 done
 cat 3.list | parallel --no-run-if-empty --linebuffer -k -j 6 " 
+  bash {}_qc_trim.sh >> ./sra2qc_trim_fastqc.log 2>&1"
+
+cat 1.list | while read id
+do
+  sed "s/{}/${id}/g" human.sh > ${id}_qc_trim.sh
+done
+cat 1.list | parallel --no-run-if-empty --linebuffer -k -j 6 " 
   bash {}_qc_trim.sh >> ./sra2qc_trim_fastqc.log 2>&1"
 
 cd ../fastqc
