@@ -247,13 +247,13 @@ SRR21163363
 
 
 vim 3.list
-SRR21163263
-SRR21163264
+SRR21163263.
+SRR21163264.
 SRR21163311
 SRR21163312
-SRR21163339
+SRR21163339.
 SRR21163340
-SRR21163357
+SRR21163357.
 SRR21163358
 SRR21163371
 SRR21163372
@@ -308,6 +308,20 @@ cp -r ./* /mnt/xuruizhi/ATAC_brain/human/genome/
 2. 批量处理
 ```bash
 # 转入超算
+rsync -av /mnt/xuruizhi/ATAC_brain/human/sequence \
+wangq@202.119.37.251:/scratch/wangq/xrz/ATAC_brain/human/
+rsync -av /mnt/xuruizhi/ATAC_brain/human/trim \
+wangq@202.119.37.251:/scratch/wangq/xrz/ATAC_brain/human/
+rsync -av /mnt/xuruizhi/ATAC_brain/human/sra \
+wangq@202.119.37.251:/scratch/wangq/xrz/ATAC_brain/human/
+rsync -av /mnt/xuruizhi/ATAC_brain/human/fastqc \
+wangq@202.119.37.251:/scratch/wangq/xrz/ATAC_brain/human/
+rsync -av /mnt/xuruizhi/ATAC_brain/human/fastqc_again \
+wangq@202.119.37.251:/scratch/wangq/xrz/ATAC_brain/human/
+rsync -av /mnt/xuruizhi/ATAC_brain/human/genome \
+wangq@202.119.37.251:/scratch/wangq/xrz/ATAC_brain/human/
+
+
 cd /scratch/wangq/xrz/ATAC_brain/human
 mkdir -p align 
 mkdir -p sort_bam
@@ -341,4 +355,45 @@ do
   bsub -q mpi -n 24  "
   bash  ${id}_align.sh >> ./align.log 2>&1"
 done
+
+
+# rmdup
+parallel -k -j 20 --no-run-if-empty --linebuffer "\
+picard MarkDuplicates -I /scratch/wangq/xrz/ATAC_brain/human/sort_bam/{}.sort.bam -O /scratch/wangq/xrz/ATAC_brain/human/rmdup/{}.rmdup.bam -REMOVE_DUPLICATES true -VALIDATION_STRINGENCY LENIENT -METRICS_FILE /scratch/wangq/xrz/ATAC_brain/human/rmdup/{}.log" :::: 3.list
+
+
+
+
+
+vim human.sh
+#!/usr/bin bash
+# This script is for pari-end sequence.
+
+# hpcc
+# index
+# cd /scratch/wangq/xrz/ATAC_brain/human/rmdup
+samtools index -@ 8 /scratch/wangq/xrz/ATAC_brain/human/rmdup/{}.rmdup.bam
+samtools flagstat -@ 8 /scratch/wangq/xrz/ATAC_brain/human/rmdup/{}.rmdup.bam > /scratch/wangq/xrz/ATAC_brain/human/rmdup/{}.rmdup.stat
+
+# rm chrM etal
+samtools view -h -f 2 -F 1804 -q 30  /scratch/wangq/xrz/ATAC_brain/human/rmdup/{}.rmdup.bam | grep -v  chrM | samtools sort -@ 20 -O bam  -o /scratch/wangq/xrz/ATAC_brain/human/filter/{}.filter.bam
+samtools index -@ 8 /scratch/wangq/xrz/ATAC_brain/human/filter/{}.filter.bam
+samtools flagstat -@ 8 /scratch/wangq/xrz/ATAC_brain/human/filter/{}.filter.bam > /scratch/wangq/xrz/ATAC_brain/human/filter/{}.filter.stat
+
+
+cd rmdup
+cp ../sequence/1.list .
+cp ../sequence/2.list .
+cp ../sequence/3.list .
+cat 3.list  | while read id
+do 
+  sed "s/{}/${id}/g" human.sh > ${id}_filter.sh
+  bsub -q mpi -n 24  "
+  bash  ${id}_filter.sh >> ./align.log 2>&1"
+done
+
+rsync -av wangq@202.119.37.251:/scratch/wangq/xrz/ATAC_brain/human/rmdup /mnt/d/ATAC_brain/human/
+rsync -av /mnt/d/ATAC_brain/human/rmdup  /mnt/xuruizhi/ATAC_brain/human/
+rsync -av /mnt/d/ATAC_brain/human/rmdup/SRR21163263.log  /mnt/xuruizhi/ATAC_brain/human/
+
 ```

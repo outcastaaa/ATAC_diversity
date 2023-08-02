@@ -3691,3 +3691,15 @@ samtools index -@ 24 $bamdir/SRR14614715.sort.bam
 samtools flagstat  -@ 24 $bamdir/SRR14614715.sort.bam > $bamdir/SRR14614715.raw.stat
 ```
 已经写好了分开bam文件的脚本。
+
+
+# 将NAS中文件转移至超算中
+```bash
+rsync -av /mnt/xuruizhi/brain/sequence wangq@202.119.37.251:/scratch/wangq/xrz/brain/
+# 已经传输完毕
+```
+
+# 将NAS中文件转移至移动硬盘中
+```bash
+rsync -av /mnt/xuruizhi/brain /mnt/e/BRAIN/
+```
