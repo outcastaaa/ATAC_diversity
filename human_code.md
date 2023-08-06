@@ -243,7 +243,7 @@ SRR21163305
 
 
 
-vim 2.list
+vim 2.list 先不处理，因为此脑区不是很重要
 SRR21163168
 SRR21163169
 SRR21163174
@@ -453,5 +453,69 @@ samtools merge要求是对排序后的bam文件进行合并，生成和现在顺
 samtools merge [options] -o out.bam [options] in1.bam ... inN.bam
 # 将对应文件合并且用脑区命名
 ```
+```bash
+cd /mnt/xuruizhi/ATAC_brain/human/final
+# 3.list
+samtools merge -@ 4 -o HAB_rep1.bam SRR21163263.final.bam SRR21163264.final.bam
+samtools merge -@ 4 -o HAB_rep2.bam SRR21163339.final.bam SRR21163340.final.bam
+samtools merge -@ 4 -o PSC_rep1.bam SRR21163311.final.bam SRR21163312.final.bam
+samtools merge -@ 4 -o PSC_rep2.bam SRR21163357.final.bam SRR21163358.final.bam
+samtools merge -@ 4 -o PSC_rep3.bam SRR21163371.final.bam SRR21163372.final.bam
+```
+
+# 6. Call peaks 
+
+```bash
+mkdir -p /mnt/xuruizhi/ATAC_brain/human/Tn5_shift
+mkdir -p /mnt/xuruizhi/ATAC_brain/human/peaks
+
+cd /mnt/xuruizhi/ATAC_brain/human/final
+vim 1.list
+PSM
+VLPFC
+CERE
+
+vim 2.list
+PAC
+PVC
+
+vim 3.list
+HAB_rep1
+HAB_rep2
+PSC_rep1
+PSC_rep2
+PSC_rep3
+
+vim 4.list
+OFC
+NACC
+CN
+
+vim 5.list
+AMY
+DLPFC
+HIPP
 
 
+vim human.sh
+# shift bed
+# cd /mnt/xuruizhi/ATAC_brain/human/final
+bedtools bamtobed -i {}.bam | xargs  cat | awk -v OFS="\t" '{
+    if ($6 == "+") {
+        print $1, $2+4, $3+4;
+    } else if ($6 == "-") {
+        print $1, $2-5, $3-5;
+    }
+}' > ../Tn5_shift/{}.Tn5.bed
+
+macs2 callpeak  -g mm --shift -75 --extsize 150 --nomodel \
+--nolambda --keep-dup all -n {} -t ../Tn5_shift/{}.Tn5.bed --outdir ../peaks/
+
+
+cat 3.list | while read id
+do
+  sed "s/{}/${id}/g" human.sh > ../peaks/${id}_callpeaks.sh
+done
+cat 3.list | parallel --no-run-if-empty --linebuffer -k -j 6 " 
+  bash ../peaks/{}_callpeaks.sh >> ../peaks/peaks.log 2>&1"
+```
