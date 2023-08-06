@@ -42,13 +42,8 @@ samtools flagstat -@ 8 /scratch/wangq/xrz/ATAC_brain/human/filter/{}.filter.bam 
 
 # local
 # rm blklist
-parallel -k -j 6 "
-  echo {} 
-  echo "{}.filter.bam"
-  bedtools intersect -wa -a {}.filter.bam -b ../blklist/mm10.blacklist.bed | \
-  wc -l  > ../blklist/{}.intersect.list
-
-  bedtools intersect -v -a {}.filter.bam -b ../blklist/mm10.blacklist.bed > ../final/{}.final.bam
-  samtools index ../final/{}.final.bam
-  samtools flagstat ../final/{}.final.bam > ../final/{}.final.stat
-"
+bedtools intersect -wa -a {}.filter.bam -b ../blklist/hg38.blacklist.bed | \
+wc -l  > ../blklist/{}.intersect.list
+bedtools intersect -v -a {}.filter.bam -b ../blklist/hg38.blacklist.bed > ../final/{}.final.bam
+samtools index -@ 6 ../final/{}.final.bam
+samtools flagstat -@ 6 ../final/{}.final.bam > ../final/{}.final.stat
