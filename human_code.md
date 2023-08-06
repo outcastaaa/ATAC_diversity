@@ -294,14 +294,13 @@ fastqc -t 6 -o /mnt/xuruizhi/ATAC_brain/human/fastqc_again /mnt/xuruizhi/ATAC_br
 fastqc -t 6 -o /mnt/xuruizhi/ATAC_brain/human/fastqc_again /mnt/xuruizhi/ATAC_brain/human/trim/{}_2_val_2.fq.gz
 
 
-
-
 cat 3.list | while read id
 do
   sed "s/{}/${id}/g" human.sh > ${id}_qc_trim.sh
 done
 cat 3.list | parallel --no-run-if-empty --linebuffer -k -j 6 " 
   bash {}_qc_trim.sh >> ./sra2qc_trim_fastqc.log 2>&1"
+
 # 其他list同理
 cat 1.list | while read id
 do
@@ -314,6 +313,8 @@ cd ../fastqc
 multiqc .
 cd  ../fastqc_again
 multiqc .
+
+# 因为质控不合格，去除203&204
 ```
 # 4. align_filter
 
@@ -353,7 +354,6 @@ mkdir -p blklist
 
 cd align
 cp ../sequence/*.list .
-
 ```
 * align
 ```bash
@@ -372,7 +372,7 @@ samtools index -@ 8 /scratch/wangq/xrz/ATAC_brain/human/sort_bam/{}.sort.bam
 samtools flagstat  -@ 8 /scratch/wangq/xrz/ATAC_brain/human/sort_bam/{}.sort.bam > /scratch/wangq/xrz/ATAC_brain/human/sort_bam/{}.raw.stat
 
 
-cat 3.list  | while read id
+cat 1.list  | while read id
 do 
   sed "s/{}/${id}/g" human.sh > ${id}_align.sh
   bsub -q mpi -n 24  "
@@ -466,6 +466,7 @@ samtools merge -@ 4 -o PSC_rep3.bam SRR21163371.final.bam SRR21163372.final.bam
 # 6. Call peaks 
 
 ```bash
+mkdir -p /mnt/xuruizhi/ATAC_brain/human/bed
 mkdir -p /mnt/xuruizhi/ATAC_brain/human/Tn5_shift
 mkdir -p /mnt/xuruizhi/ATAC_brain/human/peaks
 
@@ -497,17 +498,24 @@ DLPFC
 HIPP
 
 
+cat 3.list | while read id
+do
+  samtools flagstat -@ 6 ${id}.bam > ${id}.stat
+done
+
+
+
 vim human.sh
 # shift bed
 # cd /mnt/xuruizhi/ATAC_brain/human/final
-bedtools bamtobed -i {}.bam | xargs  cat | awk -v OFS="\t" '{
+bedtools bamtobed -i {}.bam > ../bed/{}.bed
+cat ../bed/{}.bed | awk -v OFS="\t" '{
     if ($6 == "+") {
         print $1, $2+4, $3+4;
     } else if ($6 == "-") {
         print $1, $2-5, $3-5;
     }
 }' > ../Tn5_shift/{}.Tn5.bed
-
 macs2 callpeak  -g mm --shift -75 --extsize 150 --nomodel \
 --nolambda --keep-dup all -n {} -t ../Tn5_shift/{}.Tn5.bed --outdir ../peaks/
 

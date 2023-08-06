@@ -3710,4 +3710,5 @@ rsync -avP /mnt/xuruizhi/ATAC_brain/human/sra wangq@202.119.37.251:/scratch/wang
 rsync -avP /mnt/xuruizhi/brain /mnt/e/BRAIN/
 rsync -avP /mnt/xuruizhi/RNA_brain /mnt/e/BRAIN/
 rsync -avP /mnt/xuruizhi/ATAC_brain/mouse /mnt/e/BRAIN/ATAC_brain
+rsync -avP /mnt/xuruizhi/ATAC_brain/human/sequence /mnt/e/BRAIN/ATAC_brain/human/
 ```
