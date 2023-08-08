@@ -404,7 +404,7 @@ samtools flagstat -@ 8 /scratch/wangq/xrz/ATAC_brain/human/filter/{}.filter.bam 
 
 
 cd rmdup
-cat ../sequence/1.list  | while read id
+cat ../align/HIPP.list  | while read id
 do 
   sed "s/{}/${id}/g" human.sh > ${id}_filter.sh
   bsub -q mpi -n 24  "
@@ -426,7 +426,6 @@ rm hg38.blacklist.bed.gz
 
 
 cd ../filter
-cp ../sequence/3.list .
 
 vim human.sh
 # local
@@ -438,7 +437,7 @@ samtools index -@ 6 ../final/{}.final.bam
 samtools flagstat -@ 6 ../final/{}.final.bam > ../final/{}.final.stat
 
 
-cat 3.list  | while read id
+cat ../sequence/HIPP.list  | while read id
 do 
   sed "s/{}/${id}/g" human.sh > ${id}_final.sh
   bash  ${id}_final.sh >> ./final.log 2>&1
