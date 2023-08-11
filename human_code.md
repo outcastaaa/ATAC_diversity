@@ -437,7 +437,7 @@ samtools index -@ 6 ../final/{}.final.bam
 samtools flagstat -@ 6 ../final/{}.final.bam > ../final/{}.final.stat
 
 
-cat ../sequence/HIPP.list  | while read id
+cat ../sequence/1.list  | while read id
 do 
   sed "s/{}/${id}/g" human.sh > ${id}_final.sh
   bash  ${id}_final.sh >> ./final.log 2>&1
@@ -724,14 +724,12 @@ SRR21161952
 SRR21161968
 SRR21161969
 
-
+mkdir -p ./sra
 cd ./sra
 cp /mnt/d/perl/perl_scripts/download_srr.pl ./
-cp ../human.list ./
-# 单样本举例
-perl download_srr.pl --output-dir . --srr SRR13443449
+cp ../*.list ./ 
 # 批量下载
-cat human.list | parallel -k -j 6 "
+cat 1.list | parallel -k -j 6 "
   echo {} >> ./download.log
   perl download_srr.pl --output-dir . --srr {} >> ./download.log 2>&1
 "
