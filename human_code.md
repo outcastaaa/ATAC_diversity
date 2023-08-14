@@ -736,106 +736,41 @@ cat 1.list | parallel -k -j 6 "
 cat download.log | grep " downloaded successfully"
 ```
 
+
+## 12.2 比对前质控
 ```bash
 # 在本地转换格式
 mkdir -p /mnt/xuruizhi/RNA_brain/human/sequence
-cd /mnt/xuruizhi/RNA_brain/human/sequence
-cp ../human.list ./
-
-fqdir=/mnt/xuruizhi/RNA_brain/human/sequence
-cd $fqdir
-vim sra2fq.sh
-#!/usr/bin bash
-#sra2fq
-fastq-dump --gzip --split-3 -O $fqdir ../sra/{}/{}.sra
-
-cat human.list | while read id
-do
-  sed "s/{}/${id}/g" sra2fq.sh > ${id}_sra2fq.sh
-done
-
-cat human.list | parallel --no-run-if-empty --linebuffer -k -j 8 " 
-  bash {}_sra2fq.sh"
-
-```
-2. 基因组数据
-
-
-
-## 12.2 比对前质控
-
-* 本地循环
-```bash
 mkdir -p /mnt/xuruizhi/RNA_brain/human/fastqc
 mkdir -p /mnt/xuruizhi/RNA_brain/human/trim
 mkdir -p /mnt/xuruizhi/RNA_brain/human/fastqc_again
 
-# 双端
-ls *_1.fastq.gz | sed 's/_1.fastq.gz//g'  >pair.list
 cd /mnt/xuruizhi/RNA_brain/human/sequence
-# 循环脚本
-vim human_pair.sh
+
+vim human.sh
 #!/usr/bin bash
-# This script is for pari-end sequence.
-
-# sra2fq.sh
-# fastq-dump --gzip --split-3 -O /mnt/xuruizhi/ATAC_brain/human/sequence /mnt/xuruizhi/ATAC_brain/human/sra/{}/{}.sra
-
+#sra2fq
+fastq-dump --gzip --split-3 -O /mnt/xuruizhi/RNA_brain/human/sequence /mnt/xuruizhi/RNA_brain/human/sra/{}/{}.sra
 # fastqc
- fastqc -t 6 -o ../fastqc {}_1.fastq.gz
- fastqc -t 6 -o ../fastqc {}_2.fastq.gz
-
+fastqc -o ../fastqc {}_1.fastq.gz
+fastqc -o ../fastqc {}_2.fastq.gz
 # trim
 trim_galore --phred33 --length 35 -e 0.1 --stringency 3 --paired -o ../trim  {}_1.fastq.gz  {}_2.fastq.gz
-
 # fatsqc_again
-fastqc -t 6 -o ../fastqc_again ../trim/{}_1_val_1.fq.gz
-fastqc -t 6 -o ../fastqc_again ../trim/{}_2_val_2.fq.gz
+fastqc -o ../fastqc_again ../trim/{}_1_val_1.fq.gz
+fastqc -o ../fastqc_again ../trim/{}_2_val_2.fq.gz
 
 
 
-
-cat pair.list | while read id
+cat ../sra/1.list | while read id
 do
-  sed "s/{}/${id}/g" human_pair.sh > ${id}_pair_trim.sh
+  sed "s/{}/${id}/g" human.sh > ${id}_prealign.sh
 done
-cat pair.list | parallel --no-run-if-empty --linebuffer -k -j 6 " 
-  bash {}_pair_trim.sh >> ../trim/trim_fastqc.log 2>&1"
-
-
-# 单端
-cd /mnt/xuruizhi/RNA_brain/human/sequence
-cat >single.list <<EOF
-SRR13443447
-SRR13443448
-SRR13443449
-EOF
-
-# 循环脚本
-vim human_single.sh
-#!/usr/bin bash
-# This script is for single-end sequence.
-
-# sra2fq.sh
-# fastq-dump --gzip --split-3 -O /mnt/xuruizhi/ATAC_brain/human/sequence /mnt/xuruizhi/ATAC_brain/human/sra/{}/{}.sra
-
-# fastqc
-fastqc -t 6 -o ../fastqc {}.fastq.gz
-
-# trim
-trim_galore --phred33 --length 35 -e 0.1 --stringency 3 -o ../trim {}.fastq.gz
-
-# fatsqc_again
-fastqc -t 6 -o ../fastqc_again ../trim/{}_trimmed.fq.gz
+cat ../sra/1.list | parallel --no-run-if-empty --linebuffer -k -j 6 " 
+  bash {}_prealign.sh >> ../trim/trim_fastqc.log 2>&1"
 
 
 
-
-cat single.list | while read id
-do
-  sed "s/{}/${id}/g" human_single.sh > ${id}_single_trim.sh
-  bash ${id}_single_trim.sh >> ../trim/trim_fastqc.log 2>&1
-done
 
 
 multiqc .

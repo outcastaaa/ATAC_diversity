@@ -3702,7 +3702,7 @@ rsync -avP /mnt/xuruizhi/RNA_brain/mouse/genome wangq@202.119.37.251:/scratch/wa
 rsync -avP /mnt/xuruizhi/ATAC_brain/mouse/diff_peak* wangq@202.119.37.251:/scratch/wangq/xrz/ATAC_brain/mouse
 rsync -avP /mnt/xuruizhi/ATAC_brain/mouse/rmdup wangq@202.119.37.251:/scratch/wangq/xrz/ATAC_brain/mouse
 # ATAC_brain/mouse文件夹已经传输完毕
-rsync -avP /mnt/xuruizhi/ATAC_brain/human/sra wangq@202.119.37.251:/scratch/wangq/xrz/ATAC_brain/human
+rsync -avP /mnt/xuruizhi/ATAC_brain/human/filter wangq@202.119.37.251:/scratch/wangq/xrz/ATAC_brain/human
 ```
 
 # 将NAS中文件转移至移动硬盘中
@@ -3710,5 +3710,5 @@ rsync -avP /mnt/xuruizhi/ATAC_brain/human/sra wangq@202.119.37.251:/scratch/wang
 rsync -avP /mnt/xuruizhi/brain /mnt/e/BRAIN/
 rsync -avP /mnt/xuruizhi/RNA_brain /mnt/e/BRAIN/
 rsync -avP /mnt/xuruizhi/ATAC_brain/mouse /mnt/e/BRAIN/ATAC_brain
-rsync -avP /mnt/xuruizhi/ATAC_brain/human/sequence/*  /mnt/e/BRAIN/ATAC_brain/human/sequence
+rsync -avP /mnt/xuruizhi/ATAC_brain/human/final/*  /mnt/e/BRAIN/ATAC_brain/human/final
 ```
