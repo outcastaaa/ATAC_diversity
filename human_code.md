@@ -844,7 +844,8 @@ done
 ```bash
 mkdir -p /mnt/xuruizhi/RNA_brain/human/annotation
 cd /mnt/xuruizhi/RNA_brain/human/annotation
-wget https://hgdownload.soe.ucsc.edu/goldenPath/mm10/bigZips/genes/mm10.ensGene.gtf.gz
+# UCSC注释文件比较混乱，改为NCBI
+wget https://ftp.ensembl.org/pub/release-110/gtf/homo_sapiens/Homo_sapiens.GRCh38.110.gtf.gz
 gzip -dc mm10.ensGene.gtf.gz > mm10.ensGene.gtf
 ```
 
