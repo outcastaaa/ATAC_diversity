@@ -459,6 +459,19 @@ samtools merge -@ 4 -o HAB_rep2.bam SRR21163339.final.bam SRR21163340.final.bam
 samtools merge -@ 4 -o PSC_rep1.bam SRR21163311.final.bam SRR21163312.final.bam
 samtools merge -@ 4 -o PSC_rep2.bam SRR21163357.final.bam SRR21163358.final.bam
 samtools merge -@ 4 -o PSC_rep3.bam SRR21163371.final.bam SRR21163372.final.bam
+# 1.list
+samtools merge -@ 4 -o PMC_rep1.bam SRR21163180.final.bam SRR21163181.final.bam5
+samtools merge -@ 4 -o PMC_rep2.bam SRR21163186.final.bam SRR21163187.final.bam
+samtools merge -@ 4 -o PMC_rep3.bam SRR21163293.final.bam SRR21163294.final.bam
+samtools merge -@ 4 -o VLPFC_rep1.bam SRR21163184.final.bam SRR21163185.final.bam
+samtools merge -@ 4 -o VLPFC_rep2.bam SRR21163207.final.bam SRR21163208.final.bam
+samtools merge -@ 4 -o VLPFC_rep3.bam SRR21163320.final.bam SRR21163321.final.bam
+samtools merge -@ 4 -o VLPFC_rep4.bam SRR21163337.final.bam SRR21163338.final.bam
+samtools merge -@ 4 -o CRBLM_rep1.bam SRR21163190.final.bam SRR21163191.final.bam
+samtools merge -@ 4 -o CRBLM_rep2.bam SRR21163209.final.bam SRR21163210.final.bam
+samtools merge -@ 4 -o CRBLM_rep3.bam SRR21163216.final.bam SRR21163217.final.bam
+samtools merge -@ 4 -o CRBLM_rep4.bam SRR21163365.final.bam SRR21163366.final.bam
+
 ```
 
 # 6. 对于合并和未合并都Call peaks 
@@ -470,9 +483,17 @@ mkdir -p /mnt/xuruizhi/ATAC_brain/human/peaks
 
 cd /mnt/xuruizhi/ATAC_brain/human/final
 vim 1.list
-PSM
-VLPFC
-CERE
+PMC_rep1
+PMC_rep2
+PMC_rep3
+VLPFC_rep1
+VLPFC_rep2
+VLPFC_rep3
+VLPFC_rep4
+CRBLM_rep1
+CRBLM_rep2
+CRBLM_rep3
+CRBLM_rep4
 
 vim 2.list
 PAC
@@ -579,34 +600,34 @@ vim 1.list
 # PSM
 SRR21161730
 SRR21161731
-SRR21161738
+SRR21161738.
 SRR21161739
 SRR21161881
-SRR21161882
-SRR21161914
+SRR21161882..
+SRR21161914.
 SRR21161915
 # VLPFC
-SRR21161734
+SRR21161734.
 SRR21161735
 SRR21161750
 SRR21161751
-SRR21161759
+SRR21161759.
 SRR21161760
 SRR21161765
 SRR21161766
-SRR21161909
+SRR21161909.
 SRR21161910
 SRR21161931
 SRR21161932
 # CERE
-SRR21161742
-SRR21161743
+SRR21161742.
+SRR21161743.
 SRR21161767
-SRR21161768
-SRR21161780
-SRR21161781
+SRR21161768..
+SRR21161780..
+SRR21161781.
 SRR21161961
-SRR21161962
+SRR21161962.
 
 
 vim 4.list
@@ -770,152 +791,51 @@ cat ../sra/1.list | parallel --no-run-if-empty --linebuffer -k -j 6 "
   bash {}_prealign.sh >> ../trim/trim_fastqc.log 2>&1"
 
 
-
-
-
+cd ../fastqc
+multiqc .
+cd ../fastqc_again
 multiqc .
 
 # 因为CG含量质控不合格，删除了
-# SRR14494965 2质量不合格，但是1还可以，保留
-SRR14494966 
-SRR14494968 
-SRR14494970 
-SRR14494971 
-```
-```bash
-# 传到超算
-# sequence后来的补充内容没有上传到超算
-rsync -av /mnt/xuruizhi/ATAC_brain/human/trim \
-wangq@202.119.37.251:/scratch/wangq/xrz/ATAC_brain/human/
-rsync -av /mnt/xuruizhi/ATAC_brain/human/fastqc \
-wangq@202.119.37.251:/scratch/wangq/xrz/ATAC_brain/human/
-rsync -av /mnt/xuruizhi/ATAC_brain/human/fastqc_again \
-wangq@202.119.37.251:/scratch/wangq/xrz/ATAC_brain/human/
+# 此处GC含量需要根据文献确定删除
 ```
 
 ## 12.3 比对
 
 1. 参考基因组  
 ```bash
-# 小鼠 mm10 
+# 人类 hg38 
 mkdir -p /mnt/xuruizhi/RNA_brain/human/genome
-mkdir -p /mnt/d/RNA_brain/human/genome
-cd /mnt/d/RNA_brain/human/genome
-wget https://genome-idx.s3.amazonaws.com/hisat/mm10_genome.tar.gz
-tar xvzf mm10_genome.tar.gz
-rm mm10_genome.tar.gz
-cp -r /mnt/d/RNA_brain/human/genome/* /mnt/xuruizhi/RNA_brain/human/genome
+cd /mnt/xuruizhi/RNA_brain/human/genome
+wget https://genome-idx.s3.amazonaws.com/hisat/hg38_genome.tar.gz
 
-# 通过beyond compare传输超算
-mkdir -p /scratch/wangq/xrz/RNA_brain/human/
-
-
-cd /mnt/xuruizhi/RNA_brain/human/trim
-vim pair.list
-SRR14494965 
-SRR14494974 
-SRR3595255 
-SRR3595256 
-SRR3595258 
-SRR11179785 
-SRR11179786 
-SRR11179787
-
-
-vim single.list
-SRR13443447 
-SRR13443448 
-SRR13443449 
+# 传输超算
+cd /scratch/wangq/xrz/RNA_brain/human/genome
+tar xvzf hg38_genome.tar.gz
+rm hg38_genome.tar.gz
 ```
 
 2. 比对
 ```bash
-mkdir -p /mnt/xuruizhi/RNA_brain/human/align
-# 循环 
-cd /mnt/xuruizhi/RNA_brain/human/trim
+mkdir -p /scratch/wangq/xrz/RNA_brain/human/sort_bam
+mkdir -p /scratch/wangq/xrz/RNA_brain/human/align
+cp /scratch/wangq/xrz/RNA_brain/human/*.list ../trim
+cd /scratch/wangq/xrz/RNA_brain/human/trim
 
-# 双端
-hisat2 -p 6 -t -x ../genome/mm10/genome -1 {}_1_val_1.fq.gz -2 {}_2_val_2.fq.gz -S ../align/{}.sam 2>../align/{}.log 2>&1
-
-# 单端
-hisat2 -p 6 -t -x ../genome/mm10/genome -U {}_trimmed.fq.gz -S ../align/{}.sam 2>../align/{}.log 2>&1
-```
-
-3. sort_transfertobam_index  
-```bash
-mkdir -p /mnt/xuruizhi/RNA_brain/human/sort_bam
-# 双端与单端一致
-samtools sort -@ 6 ../align/{}.sam > ../sort_bam/{}.sort.bam
-samtools index -@ 6 ../sort_bam/{}.sort.bam
-samtools flagstat  -@ 6 ../sort_bam/{}.sort.bam > ../sort_bam/{}.raw.stat
-```
-4. 大批量处理
-```bash
-mkdir -p /mnt/xuruizhi/RNA_brain/human/align
-mkdir -p /mnt/xuruizhi/RNA_brain/human/sort_bam
-cd /mnt/xuruizhi/RNA_brain/human/trim
-
-vim human_pair.sh
+vim human.sh
 #!/usr/bin bash
-# This script is for pair-end sequence.
-
-# sra2fq.sh
-# fastq-dump --gzip --split-3 -O /mnt/xuruizhi/ATAC_brain/human/sequence /mnt/xuruizhi/ATAC_brain/human/sra/{}/{}.sra
-
-# fastqc
-#  fastqc -t 6 -o ../fastqc {}_1.fastq.gz
-#  fastqc -t 6 -o ../fastqc {}_2.fastq.gz
-
-# # trim
-# trim_galore --phred33 --length 35 -e 0.1 --stringency 3 --paired -o ../trim  {}_1.fastq.gz  {}_2.fastq.gz
-
-# # fatsqc_again
-# fastqc -t 6 -o ../fastqc_again ../trim/{}_1_val_1.fq.gz
-# fastqc -t 6 -o ../fastqc_again ../trim/{}_2_val_2.fq.gz
-
-# align and sort
-hisat2 -p 6 -t -x ../genome/mm10/genome -1 {}_1_val_1.fq.gz -2 {}_2_val_2.fq.gz -S ../align/{}.sam 
-samtools sort -@ 6 ../align/{}.sam > ../sort_bam/{}.sort.bam
-samtools index -@ 6 ../sort_bam/{}.sort.bam
-samtools flagstat  -@ 6 ../sort_bam/{}.sort.bam > ../sort_bam/{}.raw.stat
+hisat2 -p 20 -t -x ../genome/hg38/genome -1 {}_1_val_1.fq.gz -2 {}_2_val_2.fq.gz -S ../align/{}.sam 2>../align/{}.log 
+samtools sort -@ 20 ../align/{}.sam > ../sort_bam/{}.sort.bamcat 
+samtools index -@ 8 ../sort_bam/{}.sort.bam
+samtools flagstat  -@ 8 ../sort_bam/{}.sort.bam > ../sort_bam/{}.raw.stat
 
 
-vim human_single.sh
-#!/usr/bin bash
-# This script is for single-end sequence.
 
-# sra2fq.sh
-# fastq-dump --gzip --split-3 -O /mnt/xuruizhi/ATAC_brain/human/sequence /mnt/xuruizhi/ATAC_brain/human/sra/{}/{}.sra
-
-# fastqc
-# fastqc -t 6 -o ../fastqc {}.fastq.gz
-
-# # trim
-# trim_galore --phred33 --length 35 -e 0.1 --stringency 3 -o ../trim {}.fastq.gz
-
-# # fatsqc_again
-# fastqc -t 6 -o ../fastqc_again ../trim/{}_trimmed.fq.gz
-
-# align
-hisat2 -p 6 -t -x ../genome/mm10/genome -U {}_trimmed.fq.gz -S ../align/{}.sam 
-samtools sort -@ 6 ../align/{}.sam > ../sort_bam/{}.sort.bam
-samtools index -@ 6 ../sort_bam/{}.sort.bam
-samtools flagstat  -@ 6 ../sort_bam/{}.sort.bam > ../sort_bam/{}.raw.stat
-```
-```bash
-cd /mnt/xuruizhi/RNA_brain/human/trim
-
-# 双端 
-cat pair.list  | while read id
+cat 1.list  | while read id
 do 
-  sed "s/{}/${id}/g" human_pair.sh > ${id}_pair_align.sh
-  bash  ${id}_pair_align.sh >> ../align/align_pair.log 2>&1
-done
-# 单端
-cat single.list  | while read id
-do 
-  sed "s/{}/${id}/g" human_single.sh > ${id}_single_align.sh
-  bash ${id}_single_align.sh >> ../align/align_single.log 2>&1
+  sed "s/{}/${id}/g" human.sh > ${id}_align.sh
+  bsub -q mpi -n 24  "
+  bash  ${id}_align.sh >> ./align.log 2>&1"
 done
 ```
 
