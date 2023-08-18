@@ -444,7 +444,7 @@ do
 done
 ```
 
-# 5. 合并neuron和non-neuron
+# 5. 合并neuron和non-neuron 还未全部完成
 
 samtools merge要求是对排序后的bam文件进行合并，生成和现在顺序一样的bam文件。需要注意的是，bam文件需要有.bai索引。
 ```bash
@@ -846,7 +846,7 @@ mkdir -p /mnt/xuruizhi/RNA_brain/human/annotation
 cd /mnt/xuruizhi/RNA_brain/human/annotation
 # UCSC注释文件比较混乱，改为NCBI
 wget https://ftp.ensembl.org/pub/release-110/gtf/homo_sapiens/Homo_sapiens.GRCh38.110.gtf.gz
-gzip -dc mm10.ensGene.gtf.gz > mm10.ensGene.gtf
+gzip -dc Homo_sapiens.GRCh38.110.gtf.gz > hg38.gtf
 ```
 
 2. 统计
