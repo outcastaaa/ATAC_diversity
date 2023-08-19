@@ -460,7 +460,7 @@ samtools merge -@ 4 -o PSC_rep1.bam SRR21163311.final.bam SRR21163312.final.bam
 samtools merge -@ 4 -o PSC_rep2.bam SRR21163357.final.bam SRR21163358.final.bam
 samtools merge -@ 4 -o PSC_rep3.bam SRR21163371.final.bam SRR21163372.final.bam
 # 1.list
-samtools merge -@ 4 -o PMC_rep1.bam SRR21163180.final.bam SRR21163181.final.bam5
+samtools merge -@ 4 -o PMC_rep1.bam SRR21163180.final.bam SRR21163181.final.bam
 samtools merge -@ 4 -o PMC_rep2.bam SRR21163186.final.bam SRR21163187.final.bam
 samtools merge -@ 4 -o PMC_rep3.bam SRR21163293.final.bam SRR21163294.final.bam
 samtools merge -@ 4 -o VLPFC_rep1.bam SRR21163184.final.bam SRR21163185.final.bam
@@ -471,6 +471,8 @@ samtools merge -@ 4 -o CRBLM_rep1.bam SRR21163190.final.bam SRR21163191.final.ba
 samtools merge -@ 4 -o CRBLM_rep2.bam SRR21163209.final.bam SRR21163210.final.bam
 samtools merge -@ 4 -o CRBLM_rep3.bam SRR21163216.final.bam SRR21163217.final.bam
 samtools merge -@ 4 -o CRBLM_rep4.bam SRR21163365.final.bam SRR21163366.final.bam
+samtools merge -@ 4 -o HIPP_rep1.bam SRR21163267.final.bam SRR21163268.final.bam
+samtools merge -@ 4 -o HIPP_rep2.bam SRR21163304.final.bam SRR21163305.final.bam
 
 ```
 
@@ -482,6 +484,7 @@ mkdir -p /mnt/xuruizhi/ATAC_brain/human/Tn5_shift
 mkdir -p /mnt/xuruizhi/ATAC_brain/human/peaks
 
 cd /mnt/xuruizhi/ATAC_brain/human/final
+# 1_all.list 3_all.list HIPP_all.list对应详细SRR名称
 vim 1.list
 PMC_rep1
 PMC_rep2
@@ -517,7 +520,7 @@ DLPFC
 HIPP
 
 
-cat 3.list | while read id
+cat 1.list | while read id
 do
   samtools flagstat -@ 6 ${id}.bam > ${id}.stat
 done
@@ -539,11 +542,11 @@ macs2 callpeak  -g mm --shift -75 --extsize 150 --nomodel \
 --nolambda --keep-dup all -n {} -t ../Tn5_shift/{}.Tn5.bed --outdir ../peaks/
 
 
-cat 3.list | while read id
+cat 1_all.list | while read id
 do
   sed "s/{}/${id}/g" human.sh > ../peaks/${id}_callpeaks.sh
 done
-cat 3.list | parallel --no-run-if-empty --linebuffer -k -j 6 " 
+cat 1_all.list | parallel --no-run-if-empty --linebuffer -k -j 6 " 
   bash ../peaks/{}_callpeaks.sh >> ../peaks/peaks.log 2>&1"
 ```
 
@@ -796,8 +799,21 @@ multiqc .
 cd ../fastqc_again
 multiqc .
 
-# 因为CG含量质控不合格，删除了
-# 此处GC含量需要根据文献确定删除
+# 因为CG含量质控不合格，对文件5'端进行5bp删除
+cd /scratch/wangq/xrz/RNA_brain/human/trim
+mkdir -p ../cut
+
+cat 1.list | parallel --no-run-if-empty --linebuffer -k -j 6 " 
+  cutadapt --cut -5 {}_1_val_1.fq.gz  -o ../cut/{}_1_cut_1.fq.gz >> ../cut/cut_5bp.log 2>&1"
+fastqc -t 6 -o ../fastqc2 *.fq.gz
+
+
+# cutadapt双端3’删除
+cd /scratch/wangq/xrz/RNA_brain/human/trim
+mkdir -p ../cut2
+bsub -q mpi -n 24 -o ../cut2 '
+cat 1.list | parallel --no-run-if-empty --linebuffer -k -j 20 " 
+  cutadapt -u 5  -o ../cut2/{}_1_cut_1.fq.gz -p ../cut2/{}_2_cut_2.fq.gz {}_1_val_1.fq.gz {}_2_val_2.fq.gz  >> ../cut2/cut_5bp.log 2>&1"'
 ```
 
 ## 12.3 比对

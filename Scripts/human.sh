@@ -50,7 +50,7 @@ samtools flagstat -@ 6 ../final/{}.final.bam > ../final/{}.final.stat
 
 # shift bed
 # cd /mnt/xuruizhi/ATAC_brain/human/final
-bedtools bamtobed -i {}.bam > ../bed/{}.bed
+bedtools bamtobed -i {}.final.bam > ../bed/{}.bed
 cat ../bed/{}.bed | awk -v OFS="\t" '{
     if ($6 == "+") {
         print $1, $2+4, $3+4;
