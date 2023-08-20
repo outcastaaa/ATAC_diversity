@@ -548,12 +548,93 @@ do
 done
 cat 1_all.list | parallel --no-run-if-empty --linebuffer -k -j 6 " 
   bash ../peaks/{}_callpeaks.sh >> ../peaks/peaks.log 2>&1"
+
+cat ../final/1_all.list | parallel --no-run-if-empty --linebuffer -k -j 6 "
+  macs2 callpeak  -g mm --shift -75 --extsize 150 --nomodel \
+--nolambda --keep-dup all -n {} -t ../Tn5_shift/{}.Tn5.bed --outdir ../peaks/ "
 ```
 
+## 因为内存不够，后续内容先只处理1.list（PMC,VLPFC,CRBLM）
+# 7. Quality check
+1. fragment length distribution
+```bash
+# 在Linux中画图  
+mkdir -p /mnt/xuruizhi/ATAC_brain/human/frag_length
+cd /mnt/xuruizhi/ATAC_brain/human/final
+
+cat 1_all.list | parallel -k -j 6 "
+  echo {} 
+  java -jar /mnt/d/biosoft/picard/picard.jar CollectInsertSizeMetrics \
+  -I {}.final.bam \
+  -O ../frag_length/{}.insert_size_metrics.txt \
+  -H ../frag_length/{}.insert_size_histogram.pdf"
+
+cat 1.list | parallel -k -j 6 "
+  echo {} 
+  java -jar /mnt/d/biosoft/picard/picard.jar CollectInsertSizeMetrics \
+  -I {}.bam \
+  -O ../frag_length/{}.insert_size_metrics.txt \
+  -H ../frag_length/{}.insert_size_histogram.pdf"
+```
+
+3. 统计平均长度与长度分布情况
+* bash统计平均值
+```bash
+mkdir -p /mnt/xuruizhi/ATAC_brain/human/length
+cd /mnt/xuruizhi/ATAC_brain/human/peaks
+
+for i in *_peaks.narrowPeak
+do
+  echo $i
+  cat $i | awk '{print $3-$2}' | awk '{sum += $1} END {print avg = sum/NR}' > ../length/${i%%.*}_ave.txt
+  awk '{print $3- $2}' $i > ${i%%.*}_length.txt
+done
+
+rsync -avP /mnt/xuruizhi/ATAC_brain/human/peaks /mnt/d/ATAC_brain/human
+```
+* R中统计与画图
+！ 将R储存在 D:/ATAC_brain/human文件夹中
+```r
+setwd("D:/ATAC_brain/human/peaks")
+file_list <- list.files(pattern = "\\d+_peaks_length\\.txt")
+summary_list <- list()
+for (file in file_list) {
+  data <- read.table(file, header = TRUE)
+  summary_list[[file]] <- summary(data)
+}
+
+output_file <- "summary_output.txt" 
+
+output_lines <- character(length(file_list))
+for (i in seq_along(file_list)) {
+  output_lines[i] <- paste("Summary for", file_list[i], ":\n", capture.output(print(summary_list[[file_list[i]]])), collapse = "\n")
+}
+
+writeLines(output_lines, con = output_file)
 
 
+# 画peak length 直方图
+summary_list <- list()
+file_list <- list.files(path = "./", pattern = "\\d+_peaks_length\\.txt", full.names = TRUE)
 
+for (file in file_list) {
+  data <- read.table(file)
+  dim_data <- dim(data)
+  summary_list[[file]] <- dim_data
 
+  # 生成直方图并保存为png文件
+  png(paste0(file, "_hist.png"))
+  # pdf(paste0(file, "_hist.pdf"))
+  hist(abs(as.numeric(data[, 1])), breaks = 500, xlab = "peak length (bp)", ylab = "Frequency", main = file)
+  dev.off()
+}
+
+for (file in file_list) {
+  cat("Summary for", file, ":\n")
+  print(summary_list[[file]])
+}
+```
+4. TSS enrichment在下一节展示，很重要的判断质量的标准
 
 
 
@@ -814,6 +895,8 @@ mkdir -p ../cut2
 bsub -q mpi -n 24 -o ../cut2 '
 cat 1.list | parallel --no-run-if-empty --linebuffer -k -j 20 " 
   cutadapt -u 5  -o ../cut2/{}_1_cut_1.fq.gz -p ../cut2/{}_2_cut_2.fq.gz {}_1_val_1.fq.gz {}_2_val_2.fq.gz  >> ../cut2/cut_5bp.log 2>&1"'
+
+# 处理完发现，处理后结果不如处理前，还是保留使用原结果
 ```
 
 ## 12.3 比对

@@ -59,5 +59,13 @@ cat ../bed/{}.bed | awk -v OFS="\t" '{
     }
 }' > ../Tn5_shift/{}.Tn5.bed
 
+# cd /mnt/xuruizhi/ATAC_brain/human/final
+bedtools bamtobed -i {}.final.bam | awk -v OFS="\t" '{
+    if ($6 == "+") {
+        print $1, $2+4, $3+4;
+    } else if ($6 == "-") {
+        print $1, $2-5, $3-5;
+    }
+}' > ../Tn5_shift/{}.Tn5.bed
 
 macs2 callpeak  -g mm --shift -75 --extsize 150 --nomodel --nolambda --keep-dup all -n {} -t ../Tn5_shift/{}.Tn5.bed --outdir ../peaks/
