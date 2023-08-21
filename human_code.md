@@ -473,7 +473,9 @@ samtools merge -@ 4 -o CRBLM_rep3.bam SRR21163216.final.bam SRR21163217.final.ba
 samtools merge -@ 4 -o CRBLM_rep4.bam SRR21163365.final.bam SRR21163366.final.bam
 samtools merge -@ 4 -o HIPP_rep1.bam SRR21163267.final.bam SRR21163268.final.bam
 samtools merge -@ 4 -o HIPP_rep2.bam SRR21163304.final.bam SRR21163305.final.bam
-
+ls *rep*.bam | parallel --no-run-if-empty --linebuffer -k -j 2 '
+samtools index -@ 4 {}
+samtools flagstat -@ 4 {} > {}.stat'
 ```
 
 # 6. 对于合并和未合并都Call peaks 
@@ -637,6 +639,112 @@ for (file in file_list) {
 4. TSS enrichment在下一节展示，很重要的判断质量的标准
 
 
+# 8. Visualization    
+1.  filterbam2Bw    
+```bash 
+mkdir -p  /mnt/xuruizhi/ATAC_brain/human/bw
+cd /mnt/xuruizhi/ATAC_brain/human/final
+conda activate py3.8
+cat 1.list | while read id; 
+do 
+  bamCoverage -p 6  -b $id.bam \
+  -o ../bw/${id}.bw \
+  --binSize 20 \
+  --smoothLength 60 \
+  --normalizeUsing RPKM \
+  --centerReads 
+  >> ../bw/bamCoverage1.log 2>&1
+done
+
+cat 1_all.list | parallel --no-run-if-empty --linebuffer -k -j 4 '
+  bamCoverage -p 2  -b {}.final.bam \
+  -o ../bw/{}.bw \
+  --binSize 20 \
+  --smoothLength 60 \
+  --normalizeUsing RPKM \
+  --centerReads 
+  >> ../bw/bamCoverage1all.log 2>&1 '
+```
+
+2. TSS enrichment 
+
+下载TSS注释文件：the BED file which contains the coordinates for all genes [下载地址](http://rohsdb.cmb.usc.edu/GBshape/cgi-bin/hgTables?hgsid=6884883_WoMR8YyIAAVII92Rr1Am3Kd0jr5H&clade=mammal&org=human&db=mm10&hgta_group=genes&hgta_track=knownGene&hgta_table=0&hgta_regionType=genome&position=chr12%3A56703576-56703740&hgta_outputType=primaryTable&hgta_outFileName=)   
+[参数选择](https://www.jianshu.com/p/d6cb795af22a)   
+
+将`mm10.reseq.bed`保存在 /mnt/d/ATAC/TSS 文件夹内。 
+```bash
+# 在py3.8环境下运行
+conda activate py3.8
+mkdir -p /mnt/xuruizhi/ATAC_brain/human/TSS
+cp /mnt/d/ATAC/TSS/mm10.refseq.bed /mnt/xuruizhi/ATAC_brain/human/TSS
+
+cd /mnt/xuruizhi/ATAC_brain/human/bw
+ls *.bw | while read id; 
+do 
+  computeMatrix reference-point --referencePoint TSS -p 6 \
+    -b 1000  -a 1000 \
+    -R ../TSS/mm10.refseq.bed \
+    -S $id \
+    --skipZeros \
+    -o ../TSS/${id%%.*}_matrix.gz \
+    --outFileSortedRegions ../TSS/${id%%.*}_regions.bed
+done
+
+
+# profile plot
+cd ../TSS/
+cat ../final/human.list | while read id
+do 
+  plotProfile -m ${id}_matrix.gz \
+    -out ${id}_profile.png \
+    --perGroup \
+    --colors green \
+    --plotTitle "" \
+    --refPointLabel "TSS" \
+    -T "${id} read density" \
+    -z ""
+done
+
+# heatmap
+cat ../final/human.list | while read id
+do 
+  plotHeatmap -m ${id}_matrix.gz \
+  -out ${id}_heatmap.png \
+  --colorMap RdBu \
+  --whatToShow 'heatmap and colorbar' \
+  --zMin -8 --zMax 8  
+done
+
+
+# heatmap and profile plot
+cat ../final/human.list | while read id
+do 
+  plotHeatmap -m ${id}_matrix.gz \
+    -out ${id}_all.png \
+    --colorMap RdBu \
+    --zMin -12 --zMax 12
+done
+
+
+# 画 `gene body` 区，使用 `scale-regions`  
+cd ../bw
+mkdir -p ../genebody
+# create a matrix 
+ls *.bw | while read id; 
+do
+computeMatrix scale-regions -p 6 \
+    -b 10000  -a 10000 \
+    -R ../TSS/mm10.refseq.bed \
+    -S ${id} \
+    --skipZeros \
+    -o ../genebody/${id%%.*}_matrix.gz 
+done
+
+ls ../genebody/*.gz | while read id
+do
+  plotHeatmap -m ${id} -out ${id%%.*}_heatmap.png 
+done
+```
 
 
 
