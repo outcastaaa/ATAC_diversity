@@ -668,22 +668,21 @@ cat 1_all.list | parallel --no-run-if-empty --linebuffer -k -j 4 '
 
 2. TSS enrichment 
 
-下载TSS注释文件：the BED file which contains the coordinates for all genes [下载地址](http://rohsdb.cmb.usc.edu/GBshape/cgi-bin/hgTables?hgsid=6884883_WoMR8YyIAAVII92Rr1Am3Kd0jr5H&clade=mammal&org=human&db=mm10&hgta_group=genes&hgta_track=knownGene&hgta_table=0&hgta_regionType=genome&position=chr12%3A56703576-56703740&hgta_outputType=primaryTable&hgta_outFileName=)   
-[参数选择](https://www.jianshu.com/p/d6cb795af22a)   
+下载TSS注释文件： [下载地址](http://genome.ucsc.edu/cgi-bin/hgTables?hgsid=1682652860_KcLBsnsbOiOTzM1hWST65rw7RhuK&clade=mammal&org=Human&db=hg38&hgta_group=genes&hgta_track=knownGene&hgta_table=0&hgta_regionType=genome&position=chr2%3A25%2C160%2C915-25%2C168%2C903&hgta_outputType=bed&hgta_outFileName=hg38%C3%83%C6%92%C3%82%C2%A2%C3%83%C2%A2%C3%A2%E2%82%AC%C5%A1%C3%82%C2%AC%C3%83%C2%A2%C3%A2%E2%80%9A%C2%AC%C3%82%C2%9D%C3%83%C6%92%C3%82%C2%A2%C3%83%C2%A2%C3%A2%E2%82%AC%C5%A1%C3%82%C2%AC%C3%83%C2%A2%C3%A2%E2%80%9A%C2%AC%C3%82%C2%9Ducsc.bed)   
 
-将`mm10.reseq.bed`保存在 /mnt/d/ATAC/TSS 文件夹内。 
 ```bash
-# 在py3.8环境下运行
-conda activate py3.8
 mkdir -p /mnt/xuruizhi/ATAC_brain/human/TSS
-cp /mnt/d/ATAC/TSS/mm10.refseq.bed /mnt/xuruizhi/ATAC_brain/human/TSS
+cd /mnt/d/ATAC_brain/human/TSS
+gzip -dc hg38_ucsc.bed.gz > hg38.TSS.bed
+cp ./hg38.TSS.bed  /mnt/xuruizhi/ATAC_brain/human/TSS
+
 
 cd /mnt/xuruizhi/ATAC_brain/human/bw
 ls *.bw | while read id; 
 do 
   computeMatrix reference-point --referencePoint TSS -p 6 \
     -b 1000  -a 1000 \
-    -R ../TSS/mm10.refseq.bed \
+    -R ../TSS/hg38.tss.bed \
     -S $id \
     --skipZeros \
     -o ../TSS/${id%%.*}_matrix.gz \
@@ -729,12 +728,11 @@ done
 # 画 `gene body` 区，使用 `scale-regions`  
 cd ../bw
 mkdir -p ../genebody
-# create a matrix 
 ls *.bw | while read id; 
 do
 computeMatrix scale-regions -p 6 \
     -b 10000  -a 10000 \
-    -R ../TSS/mm10.refseq.bed \
+    -R ../TSS/hg38.tss.bed  \
     -S ${id} \
     --skipZeros \
     -o ../genebody/${id%%.*}_matrix.gz 
@@ -746,8 +744,212 @@ do
 done
 ```
 
+# 9. 寻找rep间consensus peak —— IDR
+1. 对单独样本进行整理
+* 见"human数据质量情况.xlsx文件"  
+  
+此处IDR分析为：单独神经元；单独非神经元；合并后bulk；分别进行IDR
+
+```bash
+# Sort peak by -log10(p-value)
+mkdir -p /mnt/xuruizhi/ATAC_brain/human/IDR
+cd /mnt/xuruizhi/ATAC_brain/human/peaks
+cat ../final/1.list | parallel -j 6 -k "
+sort -k8,8nr {}_peaks.narrowPeak > ../IDR/{}.narrowPeak 
+"
+cat ../final/1_all.list | parallel -j 6 -k "
+sort -k8,8nr {}_peaks.narrowPeak > ../IDR/{}.narrowPeak 
+"
+
+cd ../IDR
+cp /mnt/xuruizhi/ATAC_brain/mouse/IDR/idr.sh ./
+```
+
+2. PMC
+① 神经元
+```bash
+# SRR21163181,SRR21163187,SRR21163294
+sudo chmod +x idr.sh
+conda activate py3.8
+./idr.sh SRR21163181.narrowPeak SRR21163187.narrowPeak SRR21163294.narrowPeak .
+mv SRR21163181_SRR21163187.txt PMC_neu1.txt 
+mv SRR21163181_SRR21163294.txt PMC_neu2.txt 
+mv SRR21163187_SRR21163294.txt PMC_neu3.txt 
+
+for i in PMC_neu*.txt; do
+    awk '{if($5 >= 540) print $0}' "$i" > "${i%%.*}_common.txt"
+done
+for i in PMC_neu*_common.txt; do
+  cut -f 1,2,3 "$i" > ${i%%.*}.bed
+done
+cat PMC_neu*_common.bed | tsv-summarize -g 1 --count
+cat PMC_neu*_common.bed | grep -v "chrUn_*" | grep -v "chrY" | grep -v "random"  > PMC_neu_pool.bed
+
+wc -l PMC_neu*.bed
+  # 5279 PMC_neu1_common.bed
+  # 2481 PMC_neu2_common.bed
+  # 1452 PMC_neu3_common.bed
+  # 9189 PMC_neu_pool.bed
+sort -k1,1 -k2,2n PMC_neu_pool.bed | bedtools merge -i stdin -d 50 > PMC_neu_pool_merge.bed 
+wc -l  PMC_neu_pool_merge.bed # 6145
+```
+② 非神经元
+```bash
+# SRR21163180,SRR21163186,SRR21163293
+
+./idr.sh SRR21163180.narrowPeak SRR21163186.narrowPeak SRR21163293.narrowPeak .
+mv SRR21163180_SRR21163186.txt PMC_non1.txt 
+mv SRR21163180_SRR21163293.txt PMC_non2.txt 
+mv SRR21163186_SRR21163293.txt PMC_non3.txt 
+
+for i in PMC_non*.txt; do
+    awk '{if($5 >= 540) print $0}' "$i" > "${i%%.*}_common.txt"
+done
+for i in PMC_non*_common.txt; do
+  cut -f 1,2,3 "$i" > ${i%%.*}.bed
+done
+cat PMC_non*_common.bed | tsv-summarize -g 1 --count
+cat PMC_non*_common.bed | grep -v "chrUn_*" | grep -v "chrY" | grep -v "random"  > PMC_non_pool.bed
+wc -l PMC_non*.bed
+#  10447 PMC_non1_common.bed
+#    7267 PMC_non2_common.bed
+#    8993 PMC_non3_common.bed
+#   26627 PMC_non_pool.bed
+
+sort -k1,1 -k2,2n PMC_non_pool.bed | bedtools merge -i stdin -d 50 > PMC_non_pool_merge.bed 
+wc -l  PMC_non_pool_merge.bed # 13307
+```
+③ 合并
+```bash
+# PMC_rep1.narrowPeak,PMC_rep2.narrowPeak,PMC_rep3.narrowPeak
+
+./idr.sh PMC_rep1.narrowPeak PMC_rep2.narrowPeak PMC_rep3.narrowPeak .
+mv PMC_rep1_PMC_rep2.txt PMC_all1.txt 
+mv PMC_rep1_PMC_rep3.txt PMC_all2.txt 
+mv PMC_rep2_PMC_rep3.txt PMC_all3.txt 
+
+for i in PMC_all*.txt; do
+    awk '{if($5 >= 540) print $0}' "$i" > "${i%%.*}_common.txt"
+done
+for i in PMC_all*_common.txt; do
+  cut -f 1,2,3 "$i" > ${i%%.*}.bed
+done
+cat PMC_all*_common.bed | tsv-summarize -g 1 --count
+cat PMC_all*_common.bed | grep -v "chrUn_*" | grep -v "chrY" | grep -v "random"  > PMC_all_pool.bed
+wc -l PMC_all*.bed
+  # 12264 PMC_all1_common.bed
+  #  9020 PMC_all2_common.bed
+  # 10642 PMC_all3_common.bed
+  # 31838 PMC_all_pool.bed
+
+sort -k1,1 -k2,2n PMC_all_pool.bed | bedtools merge -i stdin -d 50 > PMC_all_pool_merge.bed 
+wc -l  PMC_all_pool_merge.bed # 15767
+```
+
+3. VLPFC
+
+① 神经元
+```bash
+# SRR21163185,SRR21163208,SRR21163321,SRR21163338
+sudo chmod +x idr.sh
+conda activate py3.8
+./idr.sh SRR21163185.narrowPeak SRR21163208.narrowPeak SRR21163321.narrowPeak SRR21163338.narrowPeak .
+mv SRR21163185_SRR21163208.txt VLPFC_neu1.txt 
+mv SRR21163185_SRR21163321.txt VLPFC_neu2.txt 
+mv SRR21163185_SRR21163338.txt VLPFC_neu3.txt 
+mv SRR21163208_SRR21163338.txt VLPFC_neu4.txt 
+mv SRR21163321_SRR21163338.txt VLPFC_neu5.txt 
+
+for i in VLPFC_neu*.txt; do
+    awk '{if($5 >= 540) print $0}' "$i" > "${i%%.*}_common.txt"
+done
+for i in VLPFC_neu*_common.txt; do
+  cut -f 1,2,3 "$i" > ${i%%.*}.bed
+done
+cat VLPFC_neu*_common.bed | tsv-summarize -g 1 --count
+cat VLPFC_neu*_common.bed | grep -v "chrUn_*" | grep -v "chrY" | grep -v "random"   > VLPFC_neu_pool.bed
+wc -l VLPFC_neu*.bed
+#   2763 VLPFC_neu1_common.bed
+#   1893 VLPFC_neu2_common.bed
+#   2597 VLPFC_neu3_common.bed
+#   3022 VLPFC_neu4_common.bed
+#   3129 VLPFC_neu5_common.bed
+#  13334 VLPFC_neu_pool.bed
+sort -k1,1 -k2,2n VLPFC_neu_pool.bed | bedtools merge -i stdin -d 50 > VLPFC_neu_pool_merge.bed 
+wc -l  VLPFC_neu_pool_merge.bed # 5190
+```
+② 非神经元
+```bash
+# SRR21163184 SRR21163207  SRR21163320  SRR21163337
+
+./idr.sh SRR21163184.narrowPeak SRR21163207.narrowPeak SRR21163320.narrowPeak SRR21163337.narrowPeak .
+mv SRR21163184_SRR21163207.txt VLPFC_non1.txt 
+mv SRR21163184_SRR21163320.txt VLPFC_non2.txt 
+mv SRR21163184_SRR21163337.txt VLPFC_non3.txt 
+mv SRR21163207_SRR21163337.txt VLPFC_non4.txt 
+mv SRR21163320_SRR21163337.txt VLPFC_non5.txt  
+
+for i in VLPFC_non*.txt; do
+    awk '{if($5 >= 540) print $0}' "$i" > "${i%%.*}_common.txt"
+done
+for i in VLPFC_non*_common.txt; do
+  cut -f 1,2,3 "$i" > ${i%%.*}.bed
+done
+cat VLPFC_non*_common.bed | tsv-summarize -g 1 --count
+cat VLPFC_non*_common.bed | grep -v "chrUn_*" | grep -v "chrY" | grep -v "random"   > VLPFC_non_pool.bed
+wc -l VLPFC_non*.bed
+  #  5774 VLPFC_non1_common.bed
+  #  3447 VLPFC_non2_common.bed
+  #  7428 VLPFC_non3_common.bed
+  #  7021 VLPFC_non4_common.bed
+  #  4677 VLPFC_non5_common.bed
+  # 28253 VLPFC_non_pool.bed
+sort -k1,1 -k2,2n VLPFC_non_pool.bed | bedtools merge -i stdin -d 50 > VLPFC_non_pool_merge.bed 
+wc -l  VLPFC_non_pool_merge.bed # 10862
+```
+③ 合并
+```bash
+# VLPFC_rep1.narrowPeak VLPFC_rep2.narrowPeak VLPFC_rep3.narrowPeak VLPFC_rep4.narrowPeak
+./idr.sh VLPFC_rep1.narrowPeak VLPFC_rep2.narrowPeak VLPFC_rep3.narrowPeak VLPFC_rep4.narrowPeak .
+mv VLPFC_rep1_VLPFC_rep2.txt VLPFC_all1.txt 
+mv VLPFC_rep1_VLPFC_rep3.txt VLPFC_all2.txt 
+mv VLPFC_rep1_VLPFC_rep4.txt VLPFC_all3.txt 
+mv VLPFC_rep2_VLPFC_rep3.txt VLPFC_all4.txt 
+mv VLPFC_rep3_VLPFC_rep4.txt VLPFC_all5.txt 
 
 
+for i in VLPFC_all*.txt; do
+    awk '{if($5 >= 540) print $0}' "$i" > "${i%%.*}_common.txt"
+done
+for i in VLPFC_all*_common.txt; do
+  cut -f 1,2,3 "$i" > ${i%%.*}.bed
+done
+cat VLPFC_all*_common.bed | tsv-summarize -g 1 --count
+cat VLPFC_all*_common.bed | grep -v "chrUn_*" | grep -v "chrY" | grep -v "random"  > VLPFC_all_pool.bed
+cat VLPFC_all_pool.bed | sort | tsv-summarize -g 1 --count 
+sort -k1,1 -k2,2n VLPFC_all_pool.bed | bedtools merge -i stdin -d 50 > VLPFC_all_pool_merge.bed 
+wc -l VLPFC_all*.bed
+  #  5985 VLPFC_all1_common.bed
+  #  4128 VLPFC_all2_common.bed
+  #  9682 VLPFC_all3_common.bed
+  #  4940 VLPFC_all4_common.bed
+  #  5320 VLPFC_all5_common.bed
+  # 29937 VLPFC_all_pool.bed
+  # 11986 VLPFC_all_pool_merge.bed
+```
+
+4. CRBLM
+
+
+# CERE
+SRR21163190
+SRR21163191
+SRR21163209
+SRR21163210
+SRR21163216
+SRR21163217
+SRR21163365
+SRR21163366
 
 
 
@@ -1051,9 +1253,9 @@ done
 ```bash
 mkdir -p /mnt/xuruizhi/RNA_brain/human/annotation
 cd /mnt/xuruizhi/RNA_brain/human/annotation
-# UCSC注释文件比较混乱，改为NCBI
-wget https://ftp.ensembl.org/pub/release-110/gtf/homo_sapiens/Homo_sapiens.GRCh38.110.gtf.gz
-gzip -dc Homo_sapiens.GRCh38.110.gtf.gz > hg38.gtf
+# UCSC注释文件比较混乱，改为ensembl，和小鼠保持一致
+wget https://hgdownload.soe.ucsc.edu/goldenPath/hg38/bigZips/genes/hg38.ensGene.gtf.gz
+gzip -dc hg38.ensGene.gtf.gz > hg38.gtf
 ```
 
 2. 统计
