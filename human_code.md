@@ -692,7 +692,7 @@ done
 
 # profile plot
 cd ../TSS/
-cat ../final/human.list | while read id
+cat ../final/1_all.list | while read id
 do 
   plotProfile -m ${id}_matrix.gz \
     -out ${id}_profile.png \
@@ -811,7 +811,7 @@ done
 cat PMC_non*_common.bed | tsv-summarize -g 1 --count
 cat PMC_non*_common.bed | grep -v "chrUn_*" | grep -v "chrY" | grep -v "random"  > PMC_non_pool.bed
 wc -l PMC_non*.bed
-#  10447 PMC_non1_common.bed
+#   10447 PMC_non1_common.bed
 #    7267 PMC_non2_common.bed
 #    8993 PMC_non3_common.bed
 #   26627 PMC_non_pool.bed
@@ -856,9 +856,10 @@ conda activate py3.8
 ./idr.sh SRR21163185.narrowPeak SRR21163208.narrowPeak SRR21163321.narrowPeak SRR21163338.narrowPeak .
 mv SRR21163185_SRR21163208.txt VLPFC_neu1.txt 
 mv SRR21163185_SRR21163321.txt VLPFC_neu2.txt 
-mv SRR21163185_SRR21163338.txt VLPFC_neu3.txt 
+mv SRR21163185_SRR21163338.txt VLPFC_neu3.txt
 mv SRR21163208_SRR21163338.txt VLPFC_neu4.txt 
 mv SRR21163321_SRR21163338.txt VLPFC_neu5.txt 
+mv SRR21163208_SRR21163321.txt VLPFC_neu6.txt
 
 for i in VLPFC_neu*.txt; do
     awk '{if($5 >= 540) print $0}' "$i" > "${i%%.*}_common.txt"
@@ -868,15 +869,17 @@ for i in VLPFC_neu*_common.txt; do
 done
 cat VLPFC_neu*_common.bed | tsv-summarize -g 1 --count
 cat VLPFC_neu*_common.bed | grep -v "chrUn_*" | grep -v "chrY" | grep -v "random"   > VLPFC_neu_pool.bed
-wc -l VLPFC_neu*.bed
-#   2763 VLPFC_neu1_common.bed
-#   1893 VLPFC_neu2_common.bed
-#   2597 VLPFC_neu3_common.bed
-#   3022 VLPFC_neu4_common.bed
-#   3129 VLPFC_neu5_common.bed
-#  13334 VLPFC_neu_pool.bed
 sort -k1,1 -k2,2n VLPFC_neu_pool.bed | bedtools merge -i stdin -d 50 > VLPFC_neu_pool_merge.bed 
-wc -l  VLPFC_neu_pool_merge.bed # 5190
+wc -l VLPFC_neu*.bed
+  #  2763 VLPFC_neu1_common.bed
+  #  1893 VLPFC_neu2_common.bed
+  #  2597 VLPFC_neu3_common.bed
+  #  3022 VLPFC_neu4_common.bed
+  #  3129 VLPFC_neu5_common.bed
+  #  2291 VLPFC_neu6_common.bed
+  # 28950 VLPFC_neu_pool.bed
+  #  5310 VLPFC_neu_pool_merge.bed
+
 ```
 ② 非神经元
 ```bash
@@ -888,6 +891,7 @@ mv SRR21163184_SRR21163320.txt VLPFC_non2.txt
 mv SRR21163184_SRR21163337.txt VLPFC_non3.txt 
 mv SRR21163207_SRR21163337.txt VLPFC_non4.txt 
 mv SRR21163320_SRR21163337.txt VLPFC_non5.txt  
+mv SRR21163207_SRR21163320.txt VLPFC_non6.txt 
 
 for i in VLPFC_non*.txt; do
     awk '{if($5 >= 540) print $0}' "$i" > "${i%%.*}_common.txt"
@@ -897,15 +901,16 @@ for i in VLPFC_non*_common.txt; do
 done
 cat VLPFC_non*_common.bed | tsv-summarize -g 1 --count
 cat VLPFC_non*_common.bed | grep -v "chrUn_*" | grep -v "chrY" | grep -v "random"   > VLPFC_non_pool.bed
+sort -k1,1 -k2,2n VLPFC_non_pool.bed | bedtools merge -i stdin -d 50 > VLPFC_non_pool_merge.bed 
 wc -l VLPFC_non*.bed
   #  5774 VLPFC_non1_common.bed
   #  3447 VLPFC_non2_common.bed
   #  7428 VLPFC_non3_common.bed
   #  7021 VLPFC_non4_common.bed
   #  4677 VLPFC_non5_common.bed
-  # 28253 VLPFC_non_pool.bed
-sort -k1,1 -k2,2n VLPFC_non_pool.bed | bedtools merge -i stdin -d 50 > VLPFC_non_pool_merge.bed 
-wc -l  VLPFC_non_pool_merge.bed # 10862
+  #  4063 VLPFC_non6_common.bed
+  # 32303 VLPFC_non_pool.bed
+  # 11052 VLPFC_non_pool_merge.bed
 ```
 ③ 合并
 ```bash
@@ -916,6 +921,7 @@ mv VLPFC_rep1_VLPFC_rep3.txt VLPFC_all2.txt
 mv VLPFC_rep1_VLPFC_rep4.txt VLPFC_all3.txt 
 mv VLPFC_rep2_VLPFC_rep3.txt VLPFC_all4.txt 
 mv VLPFC_rep3_VLPFC_rep4.txt VLPFC_all5.txt 
+mv VLPFC_rep2_VLPFC_rep4.txt VLPFC_all6.txt 
 
 
 for i in VLPFC_all*.txt; do
@@ -938,20 +944,90 @@ wc -l VLPFC_all*.bed
   # 11986 VLPFC_all_pool_merge.bed
 ```
 
-4. CRBLM
+4. CRBLM 同上
+
+！发现SRR21163210和SRR21163209和其他样本重复性很差，因此删除
+
+① 神经元
+```bash
+# SRR21163191.narrowPeak SRR21163210.narrowPeak SRR21163217.narrowPeak SRR21163366.narrowPeak .
+wc -l CRBLM_neu*.bed
+  #  2781 CRBLM_neu1_common.bed
+  # 21009 CRBLM_neu2_common.bed
+  # 16365 CRBLM_neu3_common.bed
+  #  2741 CRBLM_neu4_common.bed
+  #  5113 CRBLM_neu5_common.bed
+  # 14324 CRBLM_neu6_common.bed
+  # 62241 CRBLM_neu_pool.bed
+  # 26810 CRBLM_neu_pool_merge.bed
+
+# 删除210，保留CRBLM_neu2_common.bed，CRBLM_neu3_common.bed，CRBLM_neu6_common.bed
+cat CRBLM_neu2_common.bed CRBLM_neu3_common.bed CRBLM_neu6_common.bed | grep -v "chrUn_*" | grep -v "chrY" | grep -v "random"   > CRBLM_neu_pool.bed
+sort -k1,1 -k2,2n CRBLM_neu_pool.bed | bedtools merge -i stdin -d 50 > CRBLM_neu_pool_merge.bed 
+wc -l CRBLM_neu*.bed
+  #  2781 CRBLM_neu1_common.bed
+  # 21009 CRBLM_neu2_common.bed
+  # 16365 CRBLM_neu3_common.bed
+  #  2741 CRBLM_neu4_common.bed
+  #  5113 CRBLM_neu5_common.bed
+  # 14324 CRBLM_neu6_common.bed
+  # 51606 CRBLM_neu_pool.bed
+  # 26477 CRBLM_neu_pool_merge.bed
+```
+② 非神经元
+```bash
+# SRR21163190 SRR21163209 SRR21163216 SRR21163365
+wc -l CRBLM_non*.bed
+  #  1326 CRBLM_non1_common.bed
+  # 34041 CRBLM_non2_common.bed
+  # 23960 CRBLM_non3_common.bed
+  #  1457 CRBLM_non4_common.bed
+  #  1643 CRBLM_non5_common.bed
+  # 21503 CRBLM_non6_common.bed
+  # 83846 CRBLM_non_pool.bed
+  # 39475 CRBLM_non_pool_merge.bed
+
+# 删除209，保留CRBLM_non2_common.bed，CRBLM_non3_common.bed，CRBLM_non6_common.bed
+cat  CRBLM_non2_common.bed CRBLM_non3_common.bed CRBLM_non6_common.bed | grep -v "chrUn_*" | grep -v "chrY" | grep -v "random"   > CRBLM_non_pool.bed
+sort -k1,1 -k2,2n CRBLM_non_pool.bed | bedtools merge -i stdin -d 50 > CRBLM_non_pool_merge.bed 
+wc -l CRBLM_non*.bed
+  #  1326 CRBLM_non1_common.bed
+  # 34041 CRBLM_non2_common.bed
+  # 23960 CRBLM_non3_common.bed
+  #  1457 CRBLM_non4_common.bed
+  #  1643 CRBLM_non5_common.bed
+  # 21503 CRBLM_non6_common.bed
+  # 79431 CRBLM_non_pool.bed
+  # 39409 CRBLM_non_pool_merge.bed
+```
+③ 合并
+```bash
+# CRBLM_rep1.narrowPeak CRBLM_rep2.narrowPeak CRBLM_rep3.narrowPeak CRBLM_rep4.narrowPeak
+wc -l CRBLM_all*.bed
+#     517 CRBLM_all1_common.bed
+#   40800 CRBLM_all2_common.bed
+#   29784 CRBLM_all3_common.bed
+#     688 CRBLM_all4_common.bed
+#    1437 CRBLM_all5_common.bed
+#   27891 CRBLM_all6_common.bed
+#  100976 CRBLM_all_pool.bed
+#   48258 CRBLM_all_pool_merge.bed
 
 
-# CERE
-SRR21163190
-SRR21163191
-SRR21163209
-SRR21163210
-SRR21163216
-SRR21163217
-SRR21163365
-SRR21163366
-
-
+# 删除CRBLM_rep2.narrowPeak
+cat CRBLM_all2_common.bed CRBLM_all3_common.bed CRBLM_all6_common.bed | grep -v "chrUn_*" | grep -v "chrY" | grep -v "random"  > CRBLM_all_pool.bed
+cat CRBLM_all_pool.bed | sort | tsv-summarize -g 1 --count 
+sort -k1,1 -k2,2n CRBLM_all_pool.bed | bedtools merge -i stdin -d 50 > CRBLM_all_pool_merge.bed 
+wc -l CRBLM_all*.bed
+#     517 CRBLM_all1_common.bed
+#   40800 CRBLM_all2_common.bed
+#   29784 CRBLM_all3_common.bed
+#     688 CRBLM_all4_common.bed
+#    1437 CRBLM_all5_common.bed
+#   27891 CRBLM_all6_common.bed
+#   98353 CRBLM_all_pool.bed
+#   48230 CRBLM_all_pool_merge.bed
+```
 
 
 
