@@ -705,7 +705,7 @@ do
 done
 
 # heatmap
-cat ../final/human.list | while read id
+cat ../final/1_all.list | while read id
 do 
   plotHeatmap -m ${id}_matrix.gz \
   -out ${id}_heatmap.png \
@@ -716,7 +716,7 @@ done
 
 
 # heatmap and profile plot
-cat ../final/human.list | while read id
+cat ../final/1_all.list | while read id
 do 
   plotHeatmap -m ${id}_matrix.gz \
     -out ${id}_all.png \
@@ -1028,6 +1028,228 @@ wc -l CRBLM_all*.bed
 #   98353 CRBLM_all_pool.bed
 #   48230 CRBLM_all_pool_merge.bed
 ```
+
+5. 长度统计
+```bash
+cd /mnt/xuruizhi/ATAC_brain/human/IDR
+mkdir -p /mnt/xuruizhi/ATAC_brain/human/peak_length
+for i in *_pool_merge.bed
+do
+  echo $i
+  awk '{print $3- $2}' $i > ../peak_length/${i%%.*}_length.txt
+done
+mkdir -p /mnt/d/ATAC_brain/human/peak_length
+cp /mnt/xuruizhi/ATAC_brain/human/peak_length/*_pool_merge_length.txt  /mnt/d/ATAC_brain/human/peak_length/
+```
+```r
+setwd("D:/ATAC_brain/human/peak_length")
+file_list <- list.files(path = "./", pattern = ".*_pool_merge_length\\.txt$", full.names = TRUE)
+summary_list <- list()
+for (file in file_list) {
+  data <- read.table(file, header = TRUE)
+  summary_list[[file]] <- summary(data)
+}
+
+output_file <- "summary_output.txt" 
+
+output_lines <- character(length(file_list))
+for (i in seq_along(file_list)) {
+  output_lines[i] <- paste("Summary for", file_list[i], ":\n", capture.output(print(summary_list[[file_list[i]]])), collapse = "\n")
+}
+
+writeLines(output_lines, con = output_file)
+
+
+# 画直方图
+summary_list <- list()
+file_list <- list.files(path = "./", pattern = ".*_pool_merge_length\\.txt$", full.names = TRUE)
+for (file in file_list) {
+  data <- read.table(file)
+  dim_data <- dim(data)
+  summary_list[[file]] <- dim_data
+
+  png(paste0(file, "_hist.png"))
+  hist(abs(as.numeric(data[, 1])), breaks = 500, xlab = "Fragment length (bp)", ylab = "Frequency", main = file)
+  dev.off()
+}
+for (file in file_list) {
+  cat("Summary for", file, ":\n")
+  print(summary_list[[file]])
+}
+```
+6. 富集分析
+```bash
+mkdir -p /mnt/d/ATAC_brain/human/GO
+cp /mnt/xuruizhi/ATAC_brain/human/IDR/*_pool_merge.bed  /mnt/d/ATAC_brain/human/GO/
+```
+```r
+BiocManager::install("org.Hg.eg.db", force = TRUE)
+library(biomaRt)
+library(ChIPseeker)
+library(GenomicFeatures)
+library(TxDb.Hsapiens.UCSC.hg38.knownGene)
+library(org.Hs.eg.db)
+library(clusterProfiler)
+region <- c("CRBLM_all")
+region <- c("CRBLM_neu")
+region <- c("CRBLM_non")
+region <- c("PMC_all")
+region <- c("PMC_neu")
+region <- c("PMC_non")
+region <- c("VLPFC_all")
+region <- c("VLPFC_neu")
+region <- c("VLPFC_non")
+
+setwd("D:/ATAC_brain/human/GO")
+  region_peak <- readPeakFile(paste0("D:/ATAC_brain/human/GO/", region, "_pool_merge.bed"), sep = "")
+
+  png(paste0(region, "_covplot.png"))
+  covplot(region_peak)
+  dev.off()
+
+  txdb <- TxDb.Hsapiens.UCSC.hg38.knownGene
+  promoter <- getPromoters(TxDb = txdb, upstream = 1000, downstream = 1000)
+  tagMatrix <- getTagMatrix(region_peak, windows = promoter)
+  png(paste0(region, "_promoter.png"))
+  tagHeatmap(tagMatrix, xlim = c(-1000, 1000), color = "red")
+  dev.off()
+
+
+  png(paste0(region, "_avg_prof_plot.png"))
+  plotAvgProf(
+    tagMatrix,
+    xlim = c(-1000, 1000),
+    xlab = "Genomic Region (5'->3')",
+    ylab = "Peak Frequency"
+  )
+  dev.off()
+
+  region_peakAnnolist <- annotatePeak(
+    region_peak,
+    tssRegion = c(-1000, 1000),
+    TxDb = txdb,
+    annoDb = "org.Hs.eg.db"
+  )
+  write.table(
+    as.data.frame(region_peakAnnolist),
+    file = paste0(region, "_allpeak.annotation.tsv"),
+    sep = "\t",
+    row.names = FALSE,
+    quote = FALSE
+  )
+
+  png(paste0(region, "_plotAnnoPie.png"))
+  plotAnnoPie(region_peakAnnolist)
+  dev.off()
+
+  region_peakAnno <- as.data.frame(region_peakAnnolist)
+
+  ensembl_id_transform <- function(ENSEMBL_ID) {
+    a = bitr(ENSEMBL_ID, fromType = "ENSEMBL", toType = c("SYMBOL", "ENTREZID"), OrgDb = "org.Hs.eg.db")
+    return(a)
+  }
+  region_ensembl_id_transform <- ensembl_id_transform(region_peakAnno$ENSEMBL)
+  write.csv(ensembl_id_transform(region_peakAnno$ENSEMBL), file = paste0(region, "_allpeak_geneID.tsv"), quote = FALSE)
+
+  # mart <- useDataset("hsapiens_gene_ensembl", useMart("ENSEMBL_MART_ENSEMBL"))
+  region_biomart_ensembl_id_transform <- getBM(
+    attributes = c("ensembl_gene_id", "external_gene_name", "entrezgene_id", "description"),
+    filters = "ensembl_gene_id",
+    values = region_peakAnno$ENSEMBL,
+    mart = mart
+  )
+  write.csv(region_biomart_ensembl_id_transform, file = paste0(region, "_allpeak_biomart_geneID.tsv"), quote = FALSE)
+
+  # GO analysis and barplot
+  region_biomart <- enrichGO(
+    gene = region_biomart_ensembl_id_transform$entrezgene_id, 
+    keyType = "ENTREZID",
+    OrgDb = org.Hs.eg.db,
+    ont = "BP",
+    pAdjustMethod = "BH",
+    qvalueCutoff = 0.05,
+    readable = TRUE
+  )
+  pdf(file = paste0(region, "_biomart.pdf"))
+  barplot(region_biomart, showCategory = 40, font.size = 6, title = paste("The GO BP enrichment analysis", sep = ""))
+  dev.off()
+
+  region_transform <- enrichGO(
+    gene = region_ensembl_id_transform$ENTREZID, 
+    keyType = "ENTREZID",
+    OrgDb = org.Hs.eg.db,
+    ont = "BP",
+    pAdjustMethod = "BH",
+    qvalueCutoff = 0.05,
+    readable = TRUE
+  )
+  pdf(file = paste0(region, "_transform.pdf"))
+  barplot(region_transform, showCategory = 40, font.size = 6, title = paste("The GO BP enrichment analysis", sep = ""))
+  dev.off()
+
+  region_kegg <- enrichKEGG(
+    gene = region_ensembl_id_transform$ENTREZID,
+    organism = 'hsa',
+    pvalueCutoff = 0.05,
+    pAdjustMethod = "BH"
+  )
+  pdf(file = paste0(region, "_kegg.pdf"))
+  barplot(region_kegg, showCategory = 20, title = "KEGG Pathway Enrichment Analysis")
+  dev.off()
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
