@@ -521,6 +521,9 @@ AMY
 DLPFC
 HIPP
 
+vim HIPP.list
+HIPP_rep1
+HIPP_rep2
 
 cat 1.list | while read id
 do
@@ -532,46 +535,48 @@ done
 vim human.sh
 # shift bed
 # cd /mnt/xuruizhi/ATAC_brain/human/final
-bedtools bamtobed -i {}.bam > ../bed/{}.bed
-cat ../bed/{}.bed | awk -v OFS="\t" '{
+bedtools bamtobed -i {}.final.bam | awk -v OFS="\t" '{
     if ($6 == "+") {
         print $1, $2+4, $3+4;
     } else if ($6 == "-") {
         print $1, $2-5, $3-5;
     }
 }' > ../Tn5_shift/{}.Tn5.bed
-macs2 callpeak  -g mm --shift -75 --extsize 150 --nomodel \
+### 一定记得换物种要换-g参数
+macs2 callpeak  -g hs --shift -75 --extsize 150 --nomodel \
 --nolambda --keep-dup all -n {} -t ../Tn5_shift/{}.Tn5.bed --outdir ../peaks/
 
 
-cat 1_all.list | while read id
+cat HIPP_all.list | while read id
 do
   sed "s/{}/${id}/g" human.sh > ../peaks/${id}_callpeaks.sh
 done
-cat 1_all.list | parallel --no-run-if-empty --linebuffer -k -j 6 " 
+cat HIPP_all.list | parallel --no-run-if-empty --linebuffer -k -j 6 " 
   bash ../peaks/{}_callpeaks.sh >> ../peaks/peaks.log 2>&1"
 
-cat ../final/1_all.list | parallel --no-run-if-empty --linebuffer -k -j 6 "
-  macs2 callpeak  -g mm --shift -75 --extsize 150 --nomodel \
---nolambda --keep-dup all -n {} -t ../Tn5_shift/{}.Tn5.bed --outdir ../peaks/ "
+# 因为前面做的都出错，因此直接全部重新call peak
+cd ../Tn5_shift
+ls *.Tn5.bed | parallel --no-run-if-empty --linebuffer -k -j 6 " 
+macs2 callpeak  -g hs --shift -75 --extsize 150 --nomodel --nolambda --keep-dup all -n {} -t ./{} --outdir ../peaks/ >> ../peaks/peaks_new.log 2>&1 "
 ```
 
-## 因为内存不够，后续内容先只处理1.list（PMC,VLPFC,CRBLM）
-# 7. Quality check
-1. fragment length distribution
+## 后续内容先只处理1.list（PMC,VLPFC,CRBLM）+ 3.list(HAB,PSC)+ HIPP.lsit
+
+# 7. Quality check 
+1. fragment length distribution —— 此步骤不受peak影响
 ```bash
 # 在Linux中画图  
 mkdir -p /mnt/xuruizhi/ATAC_brain/human/frag_length
 cd /mnt/xuruizhi/ATAC_brain/human/final
 
-cat 1_all.list | parallel -k -j 6 "
+cat 3_all.list | parallel -k -j 6 "
   echo {} 
   java -jar /mnt/d/biosoft/picard/picard.jar CollectInsertSizeMetrics \
   -I {}.final.bam \
   -O ../frag_length/{}.insert_size_metrics.txt \
   -H ../frag_length/{}.insert_size_histogram.pdf"
 
-cat 1.list | parallel -k -j 6 "
+cat 3.list | parallel -k -j 6 "
   echo {} 
   java -jar /mnt/d/biosoft/picard/picard.jar CollectInsertSizeMetrics \
   -I {}.bam \
@@ -640,12 +645,12 @@ for (file in file_list) {
 
 
 # 8. Visualization    
-1.  filterbam2Bw    
+1.  filterbam2Bw  —— 此步骤不受peak影响
 ```bash 
 mkdir -p  /mnt/xuruizhi/ATAC_brain/human/bw
 cd /mnt/xuruizhi/ATAC_brain/human/final
 conda activate py3.8
-cat 1.list | while read id; 
+cat 3.list | while read id; 
 do 
   bamCoverage -p 6  -b $id.bam \
   -o ../bw/${id}.bw \
@@ -656,7 +661,7 @@ do
   >> ../bw/bamCoverage1.log 2>&1
 done
 
-cat 1_all.list | parallel --no-run-if-empty --linebuffer -k -j 4 '
+cat 3_all.list | parallel --no-run-if-empty --linebuffer -k -j 4 '
   bamCoverage -p 2  -b {}.final.bam \
   -o ../bw/{}.bw \
   --binSize 20 \
@@ -666,7 +671,7 @@ cat 1_all.list | parallel --no-run-if-empty --linebuffer -k -j 4 '
   >> ../bw/bamCoverage1all.log 2>&1 '
 ```
 
-2. TSS enrichment 
+2. TSS enrichment   —— 此步骤不受peak影响
 
 下载TSS注释文件： [下载地址](http://genome.ucsc.edu/cgi-bin/hgTables?hgsid=1682652860_KcLBsnsbOiOTzM1hWST65rw7RhuK&clade=mammal&org=Human&db=hg38&hgta_group=genes&hgta_track=knownGene&hgta_table=0&hgta_regionType=genome&position=chr2%3A25%2C160%2C915-25%2C168%2C903&hgta_outputType=bed&hgta_outFileName=hg38%C3%83%C6%92%C3%82%C2%A2%C3%83%C2%A2%C3%A2%E2%82%AC%C5%A1%C3%82%C2%AC%C3%83%C2%A2%C3%A2%E2%80%9A%C2%AC%C3%82%C2%9D%C3%83%C6%92%C3%82%C2%A2%C3%83%C2%A2%C3%A2%E2%82%AC%C5%A1%C3%82%C2%AC%C3%83%C2%A2%C3%A2%E2%80%9A%C2%AC%C3%82%C2%9Ducsc.bed)   
 
@@ -678,15 +683,15 @@ cp ./hg38.TSS.bed  /mnt/xuruizhi/ATAC_brain/human/TSS
 
 
 cd /mnt/xuruizhi/ATAC_brain/human/bw
-ls *.bw | while read id; 
+cat ../final/3_all.list | while read id; 
 do 
   computeMatrix reference-point --referencePoint TSS -p 6 \
     -b 1000  -a 1000 \
     -R ../TSS/hg38.tss.bed \
-    -S $id \
+    -S ${id}.bw \
     --skipZeros \
-    -o ../TSS/${id%%.*}_matrix.gz \
-    --outFileSortedRegions ../TSS/${id%%.*}_regions.bed
+    -o ../TSS/${id}_matrix.gz \
+    --outFileSortedRegions ../TSS/${id}_regions.bed
 done
 
 
@@ -757,9 +762,6 @@ cd /mnt/xuruizhi/ATAC_brain/human/peaks
 cat ../final/1.list | parallel -j 6 -k "
 sort -k8,8nr {}_peaks.narrowPeak > ../IDR/{}.narrowPeak 
 "
-cat ../final/1_all.list | parallel -j 6 -k "
-sort -k8,8nr {}_peaks.narrowPeak > ../IDR/{}.narrowPeak 
-"
 
 cd ../IDR
 cp /mnt/xuruizhi/ATAC_brain/mouse/IDR/idr.sh ./
@@ -784,14 +786,14 @@ for i in PMC_neu*_common.txt; do
 done
 cat PMC_neu*_common.bed | tsv-summarize -g 1 --count
 cat PMC_neu*_common.bed | grep -v "chrUn_*" | grep -v "chrY" | grep -v "random"  > PMC_neu_pool.bed
+sort -k1,1 -k2,2n PMC_neu_pool.bed | bedtools merge -i stdin -d 50 > PMC_neu_pool_merge.bed 
 
 wc -l PMC_neu*.bed
-  # 5279 PMC_neu1_common.bed
-  # 2481 PMC_neu2_common.bed
-  # 1452 PMC_neu3_common.bed
-  # 9189 PMC_neu_pool.bed
-sort -k1,1 -k2,2n PMC_neu_pool.bed | bedtools merge -i stdin -d 50 > PMC_neu_pool_merge.bed 
-wc -l  PMC_neu_pool_merge.bed # 6145
+  # 11728 PMC_neu1_common.bed
+  #  6858 PMC_neu2_common.bed
+  #  5856 PMC_neu3_common.bed
+  # 24398 PMC_neu_pool.bed
+  # 14971 PMC_neu_pool_merge.bed
 ```
 ② 非神经元
 ```bash
@@ -810,19 +812,17 @@ for i in PMC_non*_common.txt; do
 done
 cat PMC_non*_common.bed | tsv-summarize -g 1 --count
 cat PMC_non*_common.bed | grep -v "chrUn_*" | grep -v "chrY" | grep -v "random"  > PMC_non_pool.bed
-wc -l PMC_non*.bed
-#   10447 PMC_non1_common.bed
-#    7267 PMC_non2_common.bed
-#    8993 PMC_non3_common.bed
-#   26627 PMC_non_pool.bed
-
 sort -k1,1 -k2,2n PMC_non_pool.bed | bedtools merge -i stdin -d 50 > PMC_non_pool_merge.bed 
-wc -l  PMC_non_pool_merge.bed # 13307
+wc -l  PMC_non*.bed
+  # 15946 PMC_non1_common.bed
+  # 13837 PMC_non2_common.bed
+  # 15940 PMC_non3_common.bed
+  # 45464 PMC_non_pool.bed
+  # 23898 PMC_non_pool_merge.bed
 ```
 ③ 合并
 ```bash
 # PMC_rep1.narrowPeak,PMC_rep2.narrowPeak,PMC_rep3.narrowPeak
-
 ./idr.sh PMC_rep1.narrowPeak PMC_rep2.narrowPeak PMC_rep3.narrowPeak .
 mv PMC_rep1_PMC_rep2.txt PMC_all1.txt 
 mv PMC_rep1_PMC_rep3.txt PMC_all2.txt 
@@ -836,14 +836,13 @@ for i in PMC_all*_common.txt; do
 done
 cat PMC_all*_common.bed | tsv-summarize -g 1 --count
 cat PMC_all*_common.bed | grep -v "chrUn_*" | grep -v "chrY" | grep -v "random"  > PMC_all_pool.bed
-wc -l PMC_all*.bed
-  # 12264 PMC_all1_common.bed
-  #  9020 PMC_all2_common.bed
-  # 10642 PMC_all3_common.bed
-  # 31838 PMC_all_pool.bed
-
 sort -k1,1 -k2,2n PMC_all_pool.bed | bedtools merge -i stdin -d 50 > PMC_all_pool_merge.bed 
-wc -l  PMC_all_pool_merge.bed # 15767
+wc -l PMC_all*.bed
+  # 22589 PMC_all1_common.bed
+  # 19224 PMC_all2_common.bed
+  # 18608 PMC_all3_common.bed
+  # 60195 PMC_all_pool.bed
+  # 32487 PMC_all_pool_merge.bed
 ```
 
 3. VLPFC
@@ -857,9 +856,9 @@ conda activate py3.8
 mv SRR21163185_SRR21163208.txt VLPFC_neu1.txt 
 mv SRR21163185_SRR21163321.txt VLPFC_neu2.txt 
 mv SRR21163185_SRR21163338.txt VLPFC_neu3.txt
-mv SRR21163208_SRR21163338.txt VLPFC_neu4.txt 
-mv SRR21163321_SRR21163338.txt VLPFC_neu5.txt 
-mv SRR21163208_SRR21163321.txt VLPFC_neu6.txt
+mv SRR21163208_SRR21163321.txt VLPFC_neu4.txt
+mv SRR21163208_SRR21163338.txt VLPFC_neu5.txt 
+mv SRR21163321_SRR21163338.txt VLPFC_neu6.txt 
 
 for i in VLPFC_neu*.txt; do
     awk '{if($5 >= 540) print $0}' "$i" > "${i%%.*}_common.txt"
@@ -871,14 +870,14 @@ cat VLPFC_neu*_common.bed | tsv-summarize -g 1 --count
 cat VLPFC_neu*_common.bed | grep -v "chrUn_*" | grep -v "chrY" | grep -v "random"   > VLPFC_neu_pool.bed
 sort -k1,1 -k2,2n VLPFC_neu_pool.bed | bedtools merge -i stdin -d 50 > VLPFC_neu_pool_merge.bed 
 wc -l VLPFC_neu*.bed
-  #  2763 VLPFC_neu1_common.bed
-  #  1893 VLPFC_neu2_common.bed
-  #  2597 VLPFC_neu3_common.bed
-  #  3022 VLPFC_neu4_common.bed
-  #  3129 VLPFC_neu5_common.bed
-  #  2291 VLPFC_neu6_common.bed
-  # 28950 VLPFC_neu_pool.bed
-  #  5310 VLPFC_neu_pool_merge.bed
+  #  5649 VLPFC_neu1_common.bed
+  #  4481 VLPFC_neu2_common.bed
+  #  5092 VLPFC_neu3_common.bed
+  #  7915 VLPFC_neu4_common.bed
+  #  8603 VLPFC_neu5_common.bed
+  #  9778 VLPFC_neu6_common.bed
+  # 41322 VLPFC_neu_pool.bed
+  # 16208 VLPFC_neu_pool_merge.bed
 
 ```
 ② 非神经元
@@ -889,9 +888,10 @@ wc -l VLPFC_neu*.bed
 mv SRR21163184_SRR21163207.txt VLPFC_non1.txt 
 mv SRR21163184_SRR21163320.txt VLPFC_non2.txt 
 mv SRR21163184_SRR21163337.txt VLPFC_non3.txt 
-mv SRR21163207_SRR21163337.txt VLPFC_non4.txt 
-mv SRR21163320_SRR21163337.txt VLPFC_non5.txt  
-mv SRR21163207_SRR21163320.txt VLPFC_non6.txt 
+mv SRR21163207_SRR21163320.txt VLPFC_non4.txt 
+mv SRR21163207_SRR21163337.txt VLPFC_non5.txt 
+mv SRR21163320_SRR21163337.txt VLPFC_non6.txt  
+
 
 for i in VLPFC_non*.txt; do
     awk '{if($5 >= 540) print $0}' "$i" > "${i%%.*}_common.txt"
@@ -903,14 +903,14 @@ cat VLPFC_non*_common.bed | tsv-summarize -g 1 --count
 cat VLPFC_non*_common.bed | grep -v "chrUn_*" | grep -v "chrY" | grep -v "random"   > VLPFC_non_pool.bed
 sort -k1,1 -k2,2n VLPFC_non_pool.bed | bedtools merge -i stdin -d 50 > VLPFC_non_pool_merge.bed 
 wc -l VLPFC_non*.bed
-  #  5774 VLPFC_non1_common.bed
-  #  3447 VLPFC_non2_common.bed
-  #  7428 VLPFC_non3_common.bed
-  #  7021 VLPFC_non4_common.bed
-  #  4677 VLPFC_non5_common.bed
-  #  4063 VLPFC_non6_common.bed
-  # 32303 VLPFC_non_pool.bed
-  # 11052 VLPFC_non_pool_merge.bed
+  # 11863 VLPFC_non1_common.bed
+  #  9754 VLPFC_non2_common.bed
+  # 12114 VLPFC_non3_common.bed
+  #  8783 VLPFC_non4_common.bed
+  # 11400 VLPFC_non5_common.bed
+  # 11981 VLPFC_non6_common.bed
+  # 65667 VLPFC_non_pool.bed
+  # 21944 VLPFC_non_pool_merge.bed
 ```
 ③ 合并
 ```bash
@@ -935,13 +935,14 @@ cat VLPFC_all*_common.bed | grep -v "chrUn_*" | grep -v "chrY" | grep -v "random
 cat VLPFC_all_pool.bed | sort | tsv-summarize -g 1 --count 
 sort -k1,1 -k2,2n VLPFC_all_pool.bed | bedtools merge -i stdin -d 50 > VLPFC_all_pool_merge.bed 
 wc -l VLPFC_all*.bed
-  #  5985 VLPFC_all1_common.bed
-  #  4128 VLPFC_all2_common.bed
-  #  9682 VLPFC_all3_common.bed
-  #  4940 VLPFC_all4_common.bed
-  #  5320 VLPFC_all5_common.bed
-  # 29937 VLPFC_all_pool.bed
-  # 11986 VLPFC_all_pool_merge.bed
+  # 13062 VLPFC_all1_common.bed
+  # 13963 VLPFC_all2_common.bed
+  # 17161 VLPFC_all3_common.bed
+  # 17207 VLPFC_all4_common.bed
+  # 20876 VLPFC_all5_common.bed
+  # 18209 VLPFC_all6_common.bed
+  # 99993 VLPFC_all_pool.bed
+  # 34274 VLPFC_all_pool_merge.bed
 ```
 
 4. CRBLM 同上
@@ -950,68 +951,100 @@ wc -l VLPFC_all*.bed
 
 ① 神经元
 ```bash
-# SRR21163191.narrowPeak SRR21163210.narrowPeak SRR21163217.narrowPeak SRR21163366.narrowPeak .
+# SRR21163191.narrowPeak SRR21163210.narrowPeak SRR21163217.narrowPeak SRR21163366.narrowPeak
+./idr.sh SRR21163191.narrowPeak SRR21163210.narrowPeak SRR21163217.narrowPeak SRR21163366.narrowPeak .
+mv SRR21163191_SRR21163210.txt CRBLM_neu1.txt 
+mv SRR21163191_SRR21163217.txt CRBLM_neu2.txt 
+mv SRR21163191_SRR21163366.txt CRBLM_neu3.txt
+mv SRR21163210_SRR21163217.txt CRBLM_neu4.txt 
+mv SRR21163210_SRR21163366.txt CRBLM_neu5.txt 
+mv SRR21163217_SRR21163366.txt CRBLM_neu6.txt
+
+
+for i in CRBLM_neu*.txt; do
+    awk '{if($5 >= 540) print $0}' "$i" > "${i%%.*}_common.txt"
+done
+for i in CRBLM_neu*_common.txt; do
+  cut -f 1,2,3 "$i" > ${i%%.*}.bed
+done
+cat CRBLM_neu*_common.bed | tsv-summarize -g 1 --count
+cat CRBLM_neu*_common.bed | grep -v "chrUn_*" | grep -v "chrY" | grep -v "random"   > CRBLM_neu_pool.bed
+sort -k1,1 -k2,2n CRBLM_neu_pool.bed | bedtools merge -i stdin -d 50 > CRBLM_neu_pool_merge.bed 
+
 wc -l CRBLM_neu*.bed
-  #  2781 CRBLM_neu1_common.bed
-  # 21009 CRBLM_neu2_common.bed
-  # 16365 CRBLM_neu3_common.bed
-  #  2741 CRBLM_neu4_common.bed
-  #  5113 CRBLM_neu5_common.bed
-  # 14324 CRBLM_neu6_common.bed
-  # 62241 CRBLM_neu_pool.bed
-  # 26810 CRBLM_neu_pool_merge.bed
+  #  1828 CRBLM_neu1_common.bed
+  # 25872 CRBLM_neu2_common.bed
+  # 17825 CRBLM_neu3_common.bed
+  #  1926 CRBLM_neu4_common.bed
+  #  3622 CRBLM_neu5_common.bed
+  # 16828 CRBLM_neu6_common.bed
+  # 67752 CRBLM_neu_pool.bed
+  # 33225 CRBLM_neu_pool_merge.bed
 
 # 删除210，保留CRBLM_neu2_common.bed，CRBLM_neu3_common.bed，CRBLM_neu6_common.bed
 cat CRBLM_neu2_common.bed CRBLM_neu3_common.bed CRBLM_neu6_common.bed | grep -v "chrUn_*" | grep -v "chrY" | grep -v "random"   > CRBLM_neu_pool.bed
 sort -k1,1 -k2,2n CRBLM_neu_pool.bed | bedtools merge -i stdin -d 50 > CRBLM_neu_pool_merge.bed 
 wc -l CRBLM_neu*.bed
-  #  2781 CRBLM_neu1_common.bed
-  # 21009 CRBLM_neu2_common.bed
-  # 16365 CRBLM_neu3_common.bed
-  #  2741 CRBLM_neu4_common.bed
-  #  5113 CRBLM_neu5_common.bed
-  # 14324 CRBLM_neu6_common.bed
-  # 51606 CRBLM_neu_pool.bed
-  # 26477 CRBLM_neu_pool_merge.bed
+  # 25872 CRBLM_neu2_common.bed
+  # 17825 CRBLM_neu3_common.bed
+  # 16828 CRBLM_neu6_common.bed
+  # 60376 CRBLM_neu_pool.bed
+  # 33130 CRBLM_neu_pool_merge.bed
 ```
 ② 非神经元
 ```bash
 # SRR21163190 SRR21163209 SRR21163216 SRR21163365
+./idr.sh SRR21163190.narrowPeak SRR21163209.narrowPeak SRR21163216.narrowPeak SRR21163365.narrowPeak .
+mv SRR21163190_SRR21163209.txt CRBLM_non1.txt 
+mv SRR21163190_SRR21163216.txt CRBLM_non2.txt 
+mv SRR21163190_SRR21163365.txt CRBLM_non3.txt
+mv SRR21163209_SRR21163216.txt CRBLM_non4.txt 
+mv SRR21163209_SRR21163365.txt CRBLM_non5.txt 
+mv SRR21163216_SRR21163365.txt CRBLM_non6.txt
+
+
+for i in CRBLM_non*.txt; do
+    awk '{if($5 >= 540) print $0}' "$i" > "${i%%.*}_common.txt"
+done
+for i in CRBLM_non*_common.txt; do
+  cut -f 1,2,3 "$i" > ${i%%.*}.bed
+done
 wc -l CRBLM_non*.bed
-  #  1326 CRBLM_non1_common.bed
-  # 34041 CRBLM_non2_common.bed
-  # 23960 CRBLM_non3_common.bed
-  #  1457 CRBLM_non4_common.bed
-  #  1643 CRBLM_non5_common.bed
-  # 21503 CRBLM_non6_common.bed
-  # 83846 CRBLM_non_pool.bed
-  # 39475 CRBLM_non_pool_merge.bed
+  #  2142 CRBLM_non1_common.bed
+  # 41473 CRBLM_non2_common.bed
+  # 34733 CRBLM_non3_common.bed
+  #  2324 CRBLM_non4_common.bed
+  #  3447 CRBLM_non5_common.bed
+  # 29920 CRBLM_non6_common.bed
+  # 79431 CRBLM_non_pool.bed
+  # 39409 CRBLM_non_pool_merge.bed
 
 # 删除209，保留CRBLM_non2_common.bed，CRBLM_non3_common.bed，CRBLM_non6_common.bed
 cat  CRBLM_non2_common.bed CRBLM_non3_common.bed CRBLM_non6_common.bed | grep -v "chrUn_*" | grep -v "chrY" | grep -v "random"   > CRBLM_non_pool.bed
 sort -k1,1 -k2,2n CRBLM_non_pool.bed | bedtools merge -i stdin -d 50 > CRBLM_non_pool_merge.bed 
 wc -l CRBLM_non*.bed
-  #  1326 CRBLM_non1_common.bed
-  # 34041 CRBLM_non2_common.bed
-  # 23960 CRBLM_non3_common.bed
-  #  1457 CRBLM_non4_common.bed
-  #  1643 CRBLM_non5_common.bed
-  # 21503 CRBLM_non6_common.bed
-  # 79431 CRBLM_non_pool.bed
-  # 39409 CRBLM_non_pool_merge.bed
+#   41473 CRBLM_non2_common.bed
+#   34733 CRBLM_non3_common.bed
+#   29920 CRBLM_non6_common.bed
+#  106006 CRBLM_non_pool.bed
+#   52879 CRBLM_non_pool_merge.bed
 ```
 ③ 合并
 ```bash
 # CRBLM_rep1.narrowPeak CRBLM_rep2.narrowPeak CRBLM_rep3.narrowPeak CRBLM_rep4.narrowPeak
-wc -l CRBLM_all*.bed
-#     517 CRBLM_all1_common.bed
-#   40800 CRBLM_all2_common.bed
-#   29784 CRBLM_all3_common.bed
-#     688 CRBLM_all4_common.bed
-#    1437 CRBLM_all5_common.bed
-#   27891 CRBLM_all6_common.bed
-#  100976 CRBLM_all_pool.bed
-#   48258 CRBLM_all_pool_merge.bed
+
+./idr.sh CRBLM_rep1.narrowPeak CRBLM_rep3.narrowPeak CRBLM_rep4.narrowPeak .
+mv CRBLM_rep1_CRBLM_rep3.txt CRBLM_all2.txt 
+mv CRBLM_rep1_CRBLM_rep4.txt CRBLM_all3.txt
+mv CRBLM_rep3_CRBLM_rep4.txt CRBLM_all6.txt
+
+
+for i in CRBLM_all*.txt; do
+    awk '{if($5 >= 540) print $0}' "$i" > "${i%%.*}_common.txt"
+done
+for i in CRBLM_all*_common.txt; do
+  cut -f 1,2,3 "$i" > ${i%%.*}.bed
+done
 
 
 # 删除CRBLM_rep2.narrowPeak
@@ -1019,14 +1052,12 @@ cat CRBLM_all2_common.bed CRBLM_all3_common.bed CRBLM_all6_common.bed | grep -v 
 cat CRBLM_all_pool.bed | sort | tsv-summarize -g 1 --count 
 sort -k1,1 -k2,2n CRBLM_all_pool.bed | bedtools merge -i stdin -d 50 > CRBLM_all_pool_merge.bed 
 wc -l CRBLM_all*.bed
-#     517 CRBLM_all1_common.bed
-#   40800 CRBLM_all2_common.bed
-#   29784 CRBLM_all3_common.bed
-#     688 CRBLM_all4_common.bed
-#    1437 CRBLM_all5_common.bed
-#   27891 CRBLM_all6_common.bed
-#   98353 CRBLM_all_pool.bed
-#   48230 CRBLM_all_pool_merge.bed
+#   56132 CRBLM_all2_common.bed
+#   38131 CRBLM_all3_common.bed
+#   36760 CRBLM_all6_common.bed
+#  130779 CRBLM_all_pool.bed
+#   68379 CRBLM_all_pool_merge.bed
+#  330181 total
 ```
 
 5. 长度统计
@@ -1100,7 +1131,7 @@ region <- c("VLPFC_all")
 region <- c("VLPFC_neu")
 region <- c("VLPFC_non")
 
-setwd("D:/ATAC_brain/human/GO")
+  setwd("D:/ATAC_brain/human/GO")
   region_peak <- readPeakFile(paste0("D:/ATAC_brain/human/GO/", region, "_pool_merge.bed"), sep = "")
 
   png(paste0(region, "_covplot.png"))
@@ -1198,10 +1229,103 @@ setwd("D:/ATAC_brain/human/GO")
   dev.off()
 ```
 
+# 10. 每个脑区独有peak
+## 10.1 三个脑区：PMC,CRBLM,VLPFC
 
+1. total_diff
+```bash
+mkdir -p /mnt/xuruizhi/ATAC_brain/human/diff_peak1
+cp /mnt/xuruizhi/ATAC_brain/human/IDR/*_pool_merge.bed  /mnt/xuruizhi/ATAC_brain/human/diff_peak1
+cd /mnt/xuruizhi/ATAC_brain/human/diff_peak1
+cp /mnt/xuruizhi/ATAC_brain/mouse/diff_peak1/totaldiff_peaks.sh ./
 
+vim file_neu.list
+CRBLM_neu_pool_merge.bed
+PMC_neu_pool_merge.bed
+VLPFC_neu_pool_merge.bed
 
+vim file_non.list
+CRBLM_non_pool_merge.bed
+PMC_non_pool_merge.bed
+VLPFC_non_pool_merge.bed
 
+vim file_all.list
+CRBLM_all_pool_merge.bed
+PMC_all_pool_merge.bed
+VLPFC_all_pool_merge.bed
+
+for i in file_*.list
+do
+  echo ${i} 
+  cat ${i} | bash totaldiff_peaks.sh
+done
+```
+2. 数目统计
+
+```bash
+cd /mnt/xuruizhi/ATAC_brain/human/diff_peak1
+find . -type f -name "*_pool_merge_totaldiff.bed" -exec sh -c 'mv "$0" "${0%_pool_merge_totaldiff.bed}_totaldiff.bed"' {} \;
+
+wc -l *  
+  # 68379 CRBLM_all_pool_merge.bed
+  # 38040 CRBLM_all_totaldiff.bed
+  # 32487 PMC_all_pool_merge.bed
+  #  3766 PMC_all_totaldiff.bed
+  # 34274 VLPFC_all_pool_merge.bed
+  #  3149 VLPFC_all_totaldiff.bed
+
+  # 33130 CRBLM_neu_pool_merge.bed
+  # 22631 CRBLM_neu_totaldiff.bed
+  # 14971 PMC_neu_pool_merge.bed
+  #  2690 PMC_neu_totaldiff.bed
+  # 16208 VLPFC_neu_pool_merge.bed
+  #  3418 VLPFC_neu_totaldiff.bed
+
+  # 52879 CRBLM_non_pool_merge.bed
+  # 28673 CRBLM_non_totaldiff.bed
+  # 23898 PMC_non_pool_merge.bed
+  #  1174 PMC_non_totaldiff.bed
+  # 21944 VLPFC_non_pool_merge.bed
+  #   767 VLPFC_non_totaldiff.bed
+```
+
+3. 长度计算
+
+```bash
+mkdir -p /mnt/d/ATAC_brain/human/GO_totaldiff
+cd /mnt/xuruizhi/ATAC_brain/human/diff_peak1
+ls *_totaldiff.bed | while read id
+do
+  awk '{print ($3-$2)}' ${id} > ${id%%.*}_length.txt
+done
+cp /mnt/xuruizhi/ATAC_brain/human/diff_peak1/*_length.txt /mnt/d/ATAC_brain/human/GO_totaldiff
+cp /mnt/xuruizhi/ATAC_brain/human/diff_peak1/*_totaldiff.bed /mnt/d/ATAC_brain/human/GO_totaldiff
+```
+
+```r
+setwd("D:/ATAC_brain/human/GO_totaldiff")
+file_list <- list.files(path = "./", pattern = ".*_totaldiff_length\\.txt$", full.names = TRUE)
+# 其他同上代码
+```
+
+4. 富集分析
+```bash
+cp /mnt/xuruizhi/ATAC_brain/human/diff_peak1/*_totaldiff.bed /mnt/d/ATAC_brain/human/GO_totaldiff/
+```
+```r
+region <- c("CRBLM_all")
+region <- c("CRBLM_neu")
+region <- c("CRBLM_non")
+region <- c("PMC_all")
+region <- c("PMC_neu")
+region <- c("PMC_non")
+region <- c("VLPFC_all")
+region <- c("VLPFC_neu")
+region <- c("VLPFC_non")
+
+setwd("D:/ATAC_brain/human/GO_totaldiff/")
+region_peak <- readPeakFile(paste0("D:/ATAC_brain/human/GO_totaldiff/", region, "_totaldiff.bed"), sep = "")
+```
 
 
 
@@ -1532,7 +1656,7 @@ cd /scratch/wangq/xrz/RNA_brain/human/trim
 vim human.sh
 #!/usr/bin bash
 hisat2 -p 20 -t -x ../genome/hg38/genome -1 {}_1_val_1.fq.gz -2 {}_2_val_2.fq.gz -S ../align/{}.sam 2>../align/{}.log 
-samtools sort -@ 20 ../align/{}.sam > ../sort_bam/{}.sort.bamcat 
+samtools sort -@ 20 ../align/{}.sam > ../sort_bam/{}.sort.bam
 samtools index -@ 8 ../sort_bam/{}.sort.bam
 samtools flagstat  -@ 8 ../sort_bam/{}.sort.bam > ../sort_bam/{}.raw.stat
 

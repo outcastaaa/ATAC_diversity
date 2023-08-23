@@ -68,4 +68,4 @@ bedtools bamtobed -i {}.final.bam | awk -v OFS="\t" '{
     }
 }' > ../Tn5_shift/{}.Tn5.bed
 
-macs2 callpeak  -g mm --shift -75 --extsize 150 --nomodel --nolambda --keep-dup all -n {} -t ../Tn5_shift/{}.Tn5.bed --outdir ../peaks/
+macs2 callpeak  -g hs --shift -75 --extsize 150 --nomodel --nolambda --keep-dup all -n {} -t ../Tn5_shift/{}.Tn5.bed --outdir ../peaks/
