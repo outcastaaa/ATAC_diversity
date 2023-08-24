@@ -1327,8 +1327,93 @@ setwd("D:/ATAC_brain/human/GO_totaldiff/")
 region_peak <- readPeakFile(paste0("D:/ATAC_brain/human/GO_totaldiff/", region, "_totaldiff.bed"), sep = "")
 ```
 
+# 11. 每个脑区共有peak
+```bash
+# 建目录
+mkdir -p /mnt/xuruizhi/ATAC_brain/human/common_0.5
+
+cd /mnt/xuruizhi/ATAC_brain/human/IDR
+cp ./*_pool_merge.bed /mnt/xuruizhi/ATAC_brain/human/common_0.5/
+```
+
+```bash
+cd /mnt/xuruizhi/ATAC_brain/human/common_0.5/
+vim common_peak_0.5.sh
+#!/bin/bash
+echo "请输入文件名列表，以空格或换行符分隔："
+read -r file_list
+IFS=$' \n' read -ra file_array <<< "$file_list"
+count=1
+for ((i=0; i<${#file_array[@]}; i++)); do
+    for ((j=i+1; j<${#file_array[@]}; j++)); do
+        sample_a="${file_array[i]}"
+        sample_b="${file_array[j]}"
+        output_file="${count}$(basename "${sample_a%.*}_${sample_b%.*}_0.5.bed")"
+        ((count++))
+        bedtools intersect -a "$sample_a" -b "$sample_b" -sorted -f 0.5 -r > "$output_file"
+    done
+done
+
+bash common_peak_0.5.sh
+# CRBLM_all_pool_merge.bed PMC_all_pool_merge.bed VLPFC_all_pool_merge.bed
+# CRBLM_neu_pool_merge.bed PMC_neu_pool_merge.bed VLPFC_neu_pool_merge.bed
+# CRBLM_non_pool_merge.bed PMC_non_pool_merge.bed VLPFC_non_pool_merge.bed
 
 
+wc -l *
+  #  20848 1CRBLM_all_pool_merge_PMC_all_pool_merge_0.5.bed
+  #   7251 1CRBLM_neu_pool_merge_PMC_neu_pool_merge_0.5.bed
+  #  17542 1CRBLM_non_pool_merge_PMC_non_pool_merge_0.5.bed
+  #  21560 2CRBLM_all_pool_merge_VLPFC_all_pool_merge_0.5.bed
+  #   6808 2CRBLM_neu_pool_merge_VLPFC_neu_pool_merge_0.5.bed
+  #  16199 2CRBLM_non_pool_merge_VLPFC_non_pool_merge_0.5.bed
+  #  22062 3PMC_all_pool_merge_VLPFC_all_pool_merge_0.5.bed
+  #   9457 3PMC_neu_pool_merge_VLPFC_neu_pool_merge_0.5.bed
+  #  16371 3PMC_non_pool_merge_VLPFC_non_pool_merge_0.5.bed
+  #  68379 CRBLM_all_pool_merge.bed
+  #  33130 CRBLM_neu_pool_merge.bed
+  #  52879 CRBLM_non_pool_merge.bed
+  #  32487 PMC_all_pool_merge.bed
+  #  14971 PMC_neu_pool_merge.bed
+  #  23898 PMC_non_pool_merge.bed
+  #  34274 VLPFC_all_pool_merge.bed
+  #  16208 VLPFC_neu_pool_merge.bed
+  #  21944 VLPFC_non_pool_merge.bed
+
+
+vim common_peak_nextstep.sh
+#!/bin/bash
+echo "请输入文件名列表，以空格或换行符分隔："
+read -r file_list
+IFS=$' \n' read -ra file_array <<< "$file_list"
+first_file="${file_array[0]}"
+for ((i=1; i<${#file_array[@]}; i++)); do
+    output_file="cross$((i)).bed"
+    input_file="${file_array[i]}"
+    bedtools intersect -a "$first_file" -b "$input_file" > "$output_file"
+    first_file="$output_file"
+done
+
+
+./common_peak_nextstep.sh 
+# 1CRBLM_all_pool_merge_PMC_all_pool_merge_0.5.bed 2CRBLM_all_pool_merge_VLPFC_all_pool_merge_0.5.bed 3PMC_all_pool_merge_VLPFC_all_pool_merge_0.5.bed
+# 结果 15685 cross2.bed
+
+# 1CRBLM_neu_pool_merge_PMC_neu_pool_merge_0.5.bed 2CRBLM_neu_pool_merge_VLPFC_neu_pool_merge_0.5.bed 3PMC_neu_pool_merge_VLPFC_neu_pool_merge_0.5.bed
+# 结果 5068 cross2.bed
+
+# 1CRBLM_non_pool_merge_PMC_non_pool_merge_0.5.bed 2CRBLM_non_pool_merge_VLPFC_non_pool_merge_0.5.bed 3PMC_non_pool_merge_VLPFC_non_pool_merge_0.5.bed
+# 12620 cross2.bed
+```
+* 回比到原有peak集
+```bash
+ls *non_pool_merge.bed | while read id 
+do
+bedtools intersect -wa -u -a ${id} -b cross2.bed -sorted > ${id%%.*}_commonpeak.bed
+done
+# 12620  *non_pool_merge_commonpeak.bed 
+# 都是一一对应的关系
+```
 
 
 
@@ -1686,8 +1771,19 @@ cd /mnt/xuruizhi/RNA_brain/human/sort_bam
 mkdir -p /mnt/xuruizhi/RNA_brain/human/HTseq
 
 parallel -j 8 "
-    htseq-count -s no -f bam {1}.sort.bam ../annotation/mm10.ensGene.gtf > ../HTseq/{1}.count  2>../HTseq/{1}.log
+    htseq-count -s no -r pos -f bam {1}.sort.bam ../annotation/hg38.gtf > ../HTseq/{1}.count  2>../HTseq/{1}.log
 " ::: $(ls *.sort.bam | perl -p -e 's/\.sort\.bam$//')
+
+#下载HTSeq
+cd /mnt/d/biosoft
+wget https://files.pythonhosted.org/packages/de/13/cbeb753eb29d31bb252bc18443e79a3739bf5bd3dbc99e65fcf13db81be1/HTSeq-2.0.2.tar.gz
+tar -zxvf HTSeq-2.0.2.tar.gz
+rsync -avP /mnt/d/biosoft/HTSeq-2.0.2 wangq@202.119.37.251:~/xuruizhi/biosoft
+# 进入超算
+cd ~/xuruizhi/biosoft/HTSeq-2.0.2
+python setup.py install –user  #安装
+# 因为超算版本太低还是算了
+
 
 mkdir -p /mnt/d/RNA_brain/human/HTseq
 cp /mnt/xuruizhi/RNA_brain/human/HTseq/* /mnt/d/RNA_brain/human/HTseq
