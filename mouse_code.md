@@ -3131,7 +3131,7 @@ cd /mnt/xuruizhi/RNA_brain/mouse/sort_bam
 mkdir -p /mnt/xuruizhi/RNA_brain/mouse/HTseq
 
 parallel -j 8 "
-    htseq-count -s no -f bam {1}.sort.bam ../annotation/mm10.ensGene.gtf > ../HTseq/{1}.count  2>../HTseq/{1}.log
+    htseq-count -s no -r pos -f bam {1}.sort.bam ../annotation/mm10.ensGene.gtf > ../HTseq/{1}.count  2>../HTseq/{1}.log
 " ::: $(ls *.sort.bam | perl -p -e 's/\.sort\.bam$//')
 
 mkdir -p /mnt/d/RNA_brain/mouse/HTseq
