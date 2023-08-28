@@ -1947,49 +1947,55 @@ write.csv(data_merge, "merge.csv", quote = FALSE, row.names = FALSE)
 mkdir -p /mnt/xuruizhi/RNA_brain/human/Deseq2
 mkdir -p /mnt/d/RNA_brain/human/Deseq2
 
-# 与RNA-seq对应：HIPP,DG,PFC,SEN
-vim human.list 
-SRR14494965 PFC.
-SRR14494974 PFC.
-SRR3595255 DG.
-SRR3595256 DG.
-SRR3595258 DG.
-SRR11179785 HIPP
-SRR11179786 HIPP.
-SRR11179787 HIPP.
-SRR13443447 PUT. 
-SRR13443448 MOB.
-SRR13443449 SEN.
-
-# 因为考虑到后续Deseq2只能对有重复的样本进行分析，因此还是先使用有重复的三个脑区
 cd /mnt/d/RNA_brain/human/Deseq2
-vim human.list 
-SRR14494965
-SRR14494974
-SRR3595255
-SRR3595256
-SRR3595258
-SRR11179785
-SRR11179786
-SRR11179787
+vim 1_neu.list
+SRR21161731
+SRR21161739
+SRR21161882
+SRR21161915
+SRR21161735
+SRR21161751
+SRR21161760
+SRR21161766
+SRR21161910
+SRR21161932
+SRR21161743
+SRR21161768
+SRR21161781
+SRR21161962
+
+vim 1_non.list
+SRR21161730
+SRR21161738
+SRR21161881
+SRR21161914
+SRR21161734
+SRR21161750
+SRR21161759
+SRR21161765
+SRR21161909
+SRR21161931
+SRR21161742
+SRR21161767
+SRR21161780
+SRR21161961
+
 
 while read -r i
 do
   cp ../HTseq/${i}.count ./
-done < human.list
+done < 1_non.list
 ```
 ```r
 rm(list=ls())
 setwd("D:/RNA_brain/human/Deseq2")
 
-# 得到文件样本编号
 files <- list.files(".", "*.count")
 f_lists <- list()
 for(i in files){
     prefix = gsub("(_\\w+)?\\.count", "", i, perl=TRUE)
     f_lists[[prefix]] = i
 }
-
 id_list <- names(f_lists)
 data <- list()
 count <- 0
@@ -1999,27 +2005,50 @@ for(i in id_list){
   data[[count]] <- a
 }
 
-# 合并文件
 data_merge <- data[[1]]
 for(i in seq(2, length(id_list))){
     data_merge <- merge(data_merge, data[[i]],by="gene_id")
 }
-write.csv(data_merge, "merge.csv", quote = FALSE, row.names = FALSE)
+write.csv(data_merge, "non.csv", quote = FALSE, row.names = FALSE)
+# neu同理
 ```
-2. 差异分析，以DG为control
+2. 初步分析
 * coldata
 ```bash
 cd /mnt/d/RNA_brain/human/Deseq2 
-vim coldata.csv
+vim coldata_neu.csv
 "ids","state","condition","treatment"
-"SRR14494965","WT","PFC","treatment"
-"SRR14494974","WT","PFC","treatment"
-"SRR3595255","WT","DG","treatment"
-"SRR3595256","WT","DG","treatment"
-"SRR3595258","WT","DG","treatment"
-"SRR11179785","WT","HIPP","treatment"
-"SRR11179786","WT","HIPP","treatment"
-"SRR11179787","WT","HIPP","treatment"
+"SRR21161731","WT","neuron","PSM"
+"SRR21161739","WT","neuron","PSM"
+"SRR21161882","WT","neuron","PSM"
+"SRR21161915","WT","neuron","PSM"
+"SRR21161735","WT","neuron","VLPFC"
+"SRR21161751","WT","neuron","VLPFC"
+"SRR21161760","WT","neuron","VLPFC"
+"SRR21161766","WT","neuron","VLPFC"
+"SRR21161910","WT","neuron","VLPFC"
+"SRR21161932","WT","neuron","VLPFC"
+"SRR21161743","WT","neuron","CRBLM"
+"SRR21161768","WT","neuron","CRBLM"
+"SRR21161781","WT","neuron","CRBLM"
+"SRR21161962","WT","neuron","CRBLM"
+
+vim coldata_non.csv
+"ids","state","condition","treatment"
+"SRR21161730","WT","non-neuron","PSM"
+"SRR21161738","WT","non-neuron","PSM"
+"SRR21161881","WT","non-neuron","PSM"
+"SRR21161914","WT","non-neuron","PSM"
+"SRR21161734","WT","non-neuron","VLPFC"
+"SRR21161750","WT","non-neuron","VLPFC"
+"SRR21161759","WT","non-neuron","VLPFC"
+"SRR21161765","WT","non-neuron","VLPFC"
+"SRR21161909","WT","non-neuron","VLPFC"
+"SRR21161931","WT","non-neuron","VLPFC"
+"SRR21161742","WT","non-neuron","CRBLM"
+"SRR21161767","WT","non-neuron","CRBLM"
+"SRR21161780","WT","non-neuron","CRBLM"
+"SRR21161961","WT","non-neuron","CRBLM"
 ```
 ```r
 BiocManager::install("DESeq2")
@@ -2030,161 +2059,119 @@ library(org.Mm.eg.db)
 library(clusterProfiler)
 library(ggplot2)
 
-# 导入countdata文件
-dataframe <- read.csv("merge.csv", header=TRUE, row.names = 1)
+# neu
+dataframe <- read.csv("neu.csv", header=TRUE, row.names = 1)
 countdata <- dataframe[-(1:5),]
 countdata <- countdata[rowSums(countdata) > 0,]
 head(countdata)
 # 导入coltdata文件
-coldata <- read.table("coldata.csv", row.names = 1, header = TRUE, sep = "," ) 
+coldata <- read.table("coldata_neu.csv", row.names = 1, header = TRUE, sep = "," ) 
 countdata <- countdata[row.names(coldata)]
-dds <- DESeqDataSetFromMatrix(countData = countdata, colData = coldata, design= ~ condition)
+dds <- DESeqDataSetFromMatrix(countData = countdata, colData = coldata, design= ~ treatment)
 dds
-# 归一化
-rld <- rlog(dds, blind=FALSE)
+
+
 
 # PCA分析 
+# 归一化
+rld <- rlog(dds, blind=FALSE)
 # intgroup分组
-pcaData <- plotPCA(rld, intgroup=c("condition"),returnData = T) 
-pcaData <- pcaData[order(pcaData$condition,decreasing=F),]
-table(pcaData$condition)
+pcaData <- plotPCA(rld, intgroup=c("treatment"),returnData = T) 
+pcaData <- pcaData[order(pcaData$treatment,decreasing=F),]
+table(pcaData$treatment)
 # PCA1
-plot(pcaData[,1:2],pch = 19,col= c(rep("red",3),rep("green",3),rep("blue",2)))+ text(pcaData[,1],pcaData[,2],row.names(pcaData),cex=0.75, font = 1)+legend(-30,-5,inset = .02,pt.cex= 1.5,legend = c("DG","HIPP","PFC"), col = c( "red","green","blue"),pch = 19, cex=0.75,bty="n")
+plot(pcaData[, 1:2], pch = 19, col = c(rep("red", 4), rep("green", 4), rep("blue", 6)))
+text(pcaData[, 1], pcaData[, 2], row.names(pcaData), cex = 0.75, font = 1)
+legend(0, 0, inset = 0.02, pt.cex = 1.5, legend = c("CRBLM", "PSM", "VLPFC"), col = c("red", "green", "blue"), pch = 19, cex = 0.75, bty = "n")
 # PCA2
-plotPCA(rld, intgroup="condition") + ylim(-30, 30)+text(pcaData[,1],pcaData[,2],row.names(pcaData),cex=0.5, font = 1)
-
+plotPCA(rld, intgroup="treatment") + ylim(-30, 30)+text(pcaData[,1],pcaData[,2],row.names(pcaData),cex=0.5, font = 1)
 # 聚类热图
 library("RColorBrewer")
-# 得到数据对象中基因的计数的转化值
 gene_data_transform <- assay(rld)
-# 使用dist方法求样本之间的距离
 sampleDists <- dist(t(gene_data_transform))
-# 转化为矩阵用于后续pheatmap()方法的输入
 sampleDistMatrix <- as.matrix(sampleDists)
-# 将矩阵的名称进行修改
-rownames(sampleDistMatrix) <- rld$condition
-colnames(sampleDistMatrix) <- rld$condition
-# 设置色盘
+rownames(sampleDistMatrix) <- rld$treatment
+colnames(sampleDistMatrix) <- rld$treatment
 colors <- colorRampPalette(rev(brewer.pal(8, "Blues")) )(255)
-# 绘制热图与聚类
 pheatmap(sampleDistMatrix,
          clustering_distance_rows=sampleDists,
          clustering_distance_cols=sampleDists,
          col=colors)
-
-
-dds$condition <- factor(as.vector(dds$condition), levels = c("DG","HIPP","PFC")) 
-dds$condition
+```
+         
+3. 差异分析，以CRBLM为control
+```r
+dds$treatment <- factor(as.vector(dds$treatment), levels = c("CRBLM","PSM","VLPFC")) 
+dds$treatment
 dds <- DESeq(dds)
 resultsNames(dds) 
-# [1] "Intercept"            "condition_HIPP_vs_DG"
-# [3] "condition_PFC_vs_DG"
+# [1] "Intercept"   "treatment_PSM_vs_CRBLM"   "treatment_VLPFC_vs_CRBLM"
 ```
 
 
 
-* HIPP vs DG 
+* PSM_vs_CRBLM
 ```r
-result <- results(dds, name="condition_HIPP_vs_DG", pAdjustMethod = "fdr", alpha = 0.05)
+result <- results(dds, name="treatment_PSM_vs_CRBLM", pAdjustMethod = "fdr", alpha = 0.05)
 result_order <- result[order(result$pvalue),]
 summary(result_order)
-# out of 26613 with nonzero total read count
+# out of 52215 with nonzero total read count
 # adjusted p-value < 0.05
-# LFC > 0 (up)       : 4287, 16%
-# LFC < 0 (down)     : 5070, 19%
-# outliers [1]       : 15, 0.056%
-# low counts [2]     : 6192, 23%
-# (mean count < 2)
+# LFC > 0 (up)       : 9032, 17%
+# LFC < 0 (down)     : 4912, 9.4%
+# outliers [1]       : 140, 0.27%
+# low counts [2]     : 13160, 25%
+# (mean count < 1)
 
 table(result_order$padj<0.05)
 # FALSE  TRUE 
-# 11049  9357
-write.csv(result_order, file="HIPP_vs_DG.csv", quote = F)
-
-# 火山图
-voldata <- read.csv("HIPP_vs_DG.csv", header=TRUE, row.names = 1)
-voldata$plog <- (-log10(voldata$padj))
-voldata$compare <- ifelse(abs(voldata$log2FoldChange) >1 & voldata$padj < 0.05, ifelse(voldata$log2FoldChange >1, "up","down"), "no")
-ggplot(voldata, aes(x=log2FoldChange, y=plog,color= compare)) +
-  geom_point(alpha=.5) +
-  theme(panel.grid.major = element_blank(),
-        axis.ticks.x = element_line(size=1),
-        axis.text.x = element_text(angle=30, hjust=1, vjust=1),
-        axis.title.x=element_text(face="italic", colour="darkred", size=14), # 字体
-        axis.line = element_line(color="black"),
-        plot.title = element_text(colour="red", size=8, face="bold")) +
-  ylab("-log10(padj)") + 
-  xlab("log2FC") +
-  ggtitle("differencial genes") +
-  geom_hline(yintercept = 1) +
-  geom_vline(xintercept = -1:1) + 
-  scale_color_manual(values = c("blue", "grey", "red"))
-# MA图  
-png("MA_HIPP_DG.png")
-plotMA(result_order,ylim=c(-12,12))
-dev.off()
-
-# padj 小于 0.05 并且 Log2FC 大于 1（2倍） 或者小于 -1（1/2倍）
+# 24971 13944 
 diff_gene <- subset(result_order, padj < 0.05 & abs(log2FoldChange) > 1)
-# 查看数据框的大小
-dim(diff_gene)   #3585    6
-write.csv(diff_gene, file="diff_HIPP_DG.csv", quote = F)
+dim(diff_gene)   # 11268    6
+write.csv(diff_gene, file="neu_diff_PSM_vs_CRBLM.csv", quote = F)
 ```
 
 
-
-
-* PFC_vs_DG
+* VLPFC_vs_CRBLM
 ```r
-result <- results(dds, name="condition_PFC_vs_DG", pAdjustMethod = "fdr", alpha = 0.05)
+result <- results(dds, name="treatment_VLPFC_vs_CRBLM", pAdjustMethod = "fdr", alpha = 0.05)
 result_order <- result[order(result$pvalue),]
 summary(result_order)
-# out of 26613 with nonzero total read count
+# out of 52215 with nonzero total read count
 # adjusted p-value < 0.05
-# LFC > 0 (up)       : 7127, 27%
-# LFC < 0 (down)     : 6635, 25%
-# outliers [1]       : 15, 0.056%
-# low counts [2]     : 6192, 23%
-# (mean count < 2)
+# LFC > 0 (up)       : 9603, 18%
+# LFC < 0 (down)     : 5202, 10%
+# outliers [1]       : 140, 0.27%
+# low counts [2]     : 13160, 25%
+# (mean count < 1)
 
 table(result_order$padj<0.05)
 # FALSE  TRUE 
-#  6644 13762
-
-write.csv(result_order, file="PFC_vs_DG.csv", quote = F)
-png("MA_PFC_DG.png")
-plotMA(result_order,ylim=c(-12,12))
-dev.off()
-
+#  24110 14805
 diff_gene <- subset(result_order, padj < 0.05 & abs(log2FoldChange) > 1)
-dim(diff_gene)   #10617    6
-write.csv(diff_gene, file="diff_PFC_DG.csv", quote = F)
+dim(diff_gene)   # 11652   6
+write.csv(diff_gene, file="neu_diff_VLPFC_vs_CRBLM.csv", quote = F)
 ```
 
 
-2. 差异分析，以HIPP为control
+4. 差异分析，以PSM为control
 ```r
-library(DESeq2)
-library(pheatmap)
-library(biomaRt)
-library(org.Mm.eg.db)
-library(clusterProfiler)
-library(ggplot2)
-
 # 其他和前文一致
-dds <- DESeqDataSetFromMatrix(countData = countdata, colData = coldata, design= ~ condition)
-dds$condition <- factor(as.vector(dds$condition), levels = c("HIPP","DG","PFC")) 
-dds$condition
+dds <- DESeqDataSetFromMatrix(countData = countdata, colData = coldata, design= ~ treatment)
+dds$treatment <- factor(as.vector(dds$treatment), levels = c("PSM","CRBLM","VLPFC")) 
+dds$treatment
+
 dds <- DESeq(dds)
 resultsNames(dds) 
-# [1] "Intercept"             "condition_DG_vs_HIPP"  "condition_PFC_vs_HIPP"
+# [1] "Intercept"              "treatment_CRBLM_vs_PSM"
+# [3] "treatment_VLPFC_vs_PSM"
 ```
 
 
 
-* DG_vs_HIPP
+* CRBLM_vs_PSM
 ```r
-result <- results(dds, name="condition_DG_vs_HIPP", pAdjustMethod = "fdr", alpha = 0.05)
+result <- results(dds, name="treatment_CRBLM_vs_PSM", pAdjustMethod = "fdr", alpha = 0.05)
 result_order <- result[order(result$pvalue),]
 summary(result_order) # 和前文HIPP vs DG刚好反过来
 # out of 26613 with nonzero total read count
@@ -2197,110 +2184,91 @@ summary(result_order) # 和前文HIPP vs DG刚好反过来
 
 table(result_order$padj<0.05)
 # FALSE  TRUE 
-# 11049  9357
-write.csv(result_order, file="DG_vs_HIPP.csv", quote = F)
+# 24971 13944
 
 diff_gene <- subset(result_order, padj < 0.05 & abs(log2FoldChange) > 1)
-dim(diff_gene)   #3585    6
-write.csv(diff_gene, file="diff_DG_HIPP.csv", quote = F)
+dim(diff_gene)   #11268    6
+write.csv(diff_gene, file="neu_diff_CRBLM_vs_PSM.csv", quote = F)
 ```
 
 
-
-* PFC_vs_HIPP
+* VLPFC_vs_PSM
 ```r
-result <- results(dds, name="condition_PFC_vs_HIPP", pAdjustMethod = "fdr", alpha = 0.05)
+result <- results(dds, name="treatment_VLPFC_vs_PSM", pAdjustMethod = "fdr", alpha = 0.05)
 result_order <- result[order(result$pvalue),]
 summary(result_order)
-# out of 26613 with nonzero total read count
+# out of 52215 with nonzero total read count
 # adjusted p-value < 0.05
-# LFC > 0 (up)       : 6782, 25%
-# LFC < 0 (down)     : 6938, 26%
-# outliers [1]       : 15, 0.056%
-# low counts [2]     : 5676, 21%
-# (mean count < 1)
+# LFC > 0 (up)       : 0, 0%
+# LFC < 0 (down)     : 1, 0.0019%
+# outliers [1]       : 140, 0.27%
+# low counts [2]     : 0, 0%
+# (mean count < 0)
 
 table(result_order$padj<0.05)
 # FALSE  TRUE 
-#  7202 13720 
-
-write.csv(result_order, file="PFC_vs_HIPP.csv", quote = F)
-png("MA_PFC_HIPP.png")
-plotMA(result_order,ylim=c(-12,12))
-dev.off()
+#  52074     1
 
 diff_gene <- subset(result_order, padj < 0.05 & abs(log2FoldChange) > 1)
-dim(diff_gene)   #10400    6
-write.csv(diff_gene, file="diff_PFC_HIPP.csv", quote = F)
+dim(diff_gene)   #1    6
+write.csv(diff_gene, file="neu_diff_VLPFC_vs_PSM.csv", quote = F)
 ```
 
-3. 差异分析，以PFC为control
+5. 差异分析，以VLPFC为control
 ```r
-library(DESeq2)
-library(pheatmap)
-library(biomaRt)
-library(org.Mm.eg.db)
-library(clusterProfiler)
-library(ggplot2)
-
 # 其他和前文一致
-dds <- DESeqDataSetFromMatrix(countData = countdata, colData = coldata, design= ~ condition)
-dds$condition <- factor(as.vector(dds$condition), levels = c("PFC","HIPP","DG")) 
-dds$condition
+dds$treatment <- factor(as.vector(dds$treatment), levels = c("VLPFC","PSM","CRBLM")) 
 dds <- DESeq(dds)
 resultsNames(dds) 
-# [1] "Intercept"             "condition_HIPP_vs_PFC" "condition_DG_vs_PFC" 
+# [1] "Intercept"                "treatment_PSM_vs_VLPFC"  
+# [3] "treatment_CRBLM_vs_VLPFC"
 ```
 
 
 
-* HIPP_vs_PFC
+* PSM_vs_VLPFC
 ```r
-result <- results(dds, name="condition_HIPP_vs_PFC", pAdjustMethod = "fdr", alpha = 0.05)
+result <- results(dds, name="treatment_PSM_vs_VLPFC", pAdjustMethod = "fdr", alpha = 0.05)
 result_order <- result[order(result$pvalue),]
 summary(result_order) 
-# out of 26613 with nonzero total read count
+# out of 52215 with nonzero total read count
 # adjusted p-value < 0.05
-# LFC > 0 (up)       : 6938, 26%
-# LFC < 0 (down)     : 6782, 25%
-# outliers [1]       : 15, 0.056%
-# low counts [2]     : 5676, 21%
+# LFC > 0 (up)       : 1, 0.0019%
+# LFC < 0 (down)     : 0, 0%
+# outliers [1]       : 140, 0.27%
+# low counts [2]     : 0, 0%
+# (mean count < 0)
+
+table(result_order$padj<0.05)
+# FALSE  TRUE 
+# 52074     1 
+
+diff_gene <- subset(result_order, padj < 0.05 & abs(log2FoldChange) > 1)
+dim(diff_gene)   #1   6
+write.csv(diff_gene, file="neu_diff_PSM_vs_VLPFC.csv", quote = F)
+```
+
+
+* CRBLM_vs_VLPFC
+```r
+result <- results(dds, name="treatment_CRBLM_vs_VLPFC", pAdjustMethod = "fdr", alpha = 0.05)
+result_order <- result[order(result$pvalue),]
+summary(result_order)
+# out of 52215 with nonzero total read count
+# adjusted p-value < 0.05
+# LFC > 0 (up)       : 5202, 10%
+# LFC < 0 (down)     : 9603, 18%
+# outliers [1]       : 140, 0.27%
+# low counts [2]     : 13160, 25%
 # (mean count < 1)
 
 table(result_order$padj<0.05)
 # FALSE  TRUE 
-#  7202 13720 
-write.csv(result_order, file="HIPP_vs_PFC.csv", quote = F)
+# 24110 14805
 
 diff_gene <- subset(result_order, padj < 0.05 & abs(log2FoldChange) > 1)
-dim(diff_gene)   #10400    6
-write.csv(diff_gene, file="diff_HIPP_PFC.csv", quote = F)
-```
-
-
-
-* DG_vs_PFC
-```r
-result <- results(dds, name="condition_DG_vs_PFC", pAdjustMethod = "fdr", alpha = 0.05)
-result_order <- result[order(result$pvalue),]
-summary(result_order)
-# out of 26613 with nonzero total read count
-# adjusted p-value < 0.05
-# LFC > 0 (up)       : 6635, 25%
-# LFC < 0 (down)     : 7127, 27%
-# outliers [1]       : 15, 0.056%
-# low counts [2]     : 6192, 23%
-# (mean count < 2)
-
-table(result_order$padj<0.05)
-# FALSE  TRUE 
-#  6644 13762 
-
-write.csv(result_order, file="DG_vs_PFC.csv", quote = F)
-
-diff_gene <- subset(result_order, padj < 0.05 & abs(log2FoldChange) > 1)
-dim(diff_gene)   # 10617    6
-write.csv(diff_gene, file="diff_DG_PFC.csv", quote = F)
+dim(diff_gene)   #11652    6
+write.csv(diff_gene, file="neu_diff_CRBLM_vs_VLPFC.csv", quote = F)
 ```
 
 
@@ -2313,13 +2281,13 @@ cd /mnt/d/RNA_brain/human/Deseq2
 # diff_HIPP_DG.csv diff_HIPP_PFC.csv
 
 # 区分up/down
-for i in *.csv
+for i in neu_diff_*.csv
 do
 sed 's/,/\t/g' "$i" | tail -n +2  > "${i%.csv}.txt"
 done
 dos2unix *.txt
 
-for i in diff*.txt 
+for i in neu_diff*.txt 
 do
   echo " ==> $i <== " 
   tsv-filter --is-numeric 3 --gt 3:0 $i > ${i%%.*}_up.txt
@@ -2327,78 +2295,69 @@ do
 done
 
 wc -l *_up.txt
-   1114 diff_DG_HIPP_up.txt
-   5077 diff_DG_PFC_up.txt
-   2471 diff_HIPP_DG_up.txt
-   5348 diff_HIPP_PFC_up.txt
-   5540 diff_PFC_DG_up.txt
-   5052 diff_PFC_HIPP_up.txt
+  #  3169 neu_diff_CRBLM_vs_PSM_up.txt
+  #  3417 neu_diff_CRBLM_vs_VLPFC_up.txt
+  #  8099 neu_diff_PSM_vs_CRBLM_up.txt
+  #     1 neu_diff_PSM_vs_VLPFC_up.txt
+  #  8235 neu_diff_VLPFC_vs_CRBLM_up.txt
+  #     0 neu_diff_VLPFC_vs_PSM_up.txt
 
 wc -l *_down.txt
-   2471 diff_DG_HIPP_down.txt
-   5540 diff_DG_PFC_down.txt
-   1114 diff_HIPP_DG_down.txt
-   5052 diff_HIPP_PFC_down.txt
-   5077 diff_PFC_DG_down.txt
-   5348 diff_PFC_HIPP_down.txt
+  #  8099 neu_diff_CRBLM_vs_PSM_down.txt
+  #  8235 neu_diff_CRBLM_vs_VLPFC_down.txt
+  #  3169 neu_diff_PSM_vs_CRBLM_down.txt
+  #     0 neu_diff_PSM_vs_VLPFC_down.txt
+  #  3417 neu_diff_VLPFC_vs_CRBLM_down.txt
+  #     1 neu_diff_VLPFC_vs_PSM_down.txt
 ```
 
-* HIPP对于其他两个脑区的差异基因
+* CRBLM对于其他两个脑区的差异基因
 ```bash
 # up
-awk 'NR==FNR {a[$1]=1; next} a[$1]' diff_HIPP_DG_up.txt diff_HIPP_PFC_up.txt > diff_HIPP_up.txt # 932
+awk 'NR==FNR {a[$1]=1; next} a[$1]' neu_diff_CRBLM_vs_PSM_up.txt neu_diff_CRBLM_vs_VLPFC_up.txt > neu_diff_CRBLM_up.txt #2500
 # down
-awk 'NR==FNR {a[$1]=1; next} a[$1]' diff_HIPP_DG_down.txt diff_HIPP_PFC_down.txt > diff_HIPP_down.txt # 397
+awk 'NR==FNR {a[$1]=1; next} a[$1]' neu_diff_CRBLM_vs_PSM_down.txt neu_diff_CRBLM_vs_VLPFC_down.txt > neu_diff_CRBLM_down.txt # 7187
 
-cat diff_HIPP_up.txt diff_HIPP_down.txt > diff_HIPP.txt
+cat neu_diff_CRBLM_up.txt neu_diff_CRBLM_down.txt > neu_diff_CRBLM.txt
 ```
 ```r
 library(biomaRt)
 library(ChIPseeker)
 library(GenomicFeatures)
-library(TxDb.Mmusculus.UCSC.mm10.knownGene)
-library(org.Mm.eg.db)
+library(TxDb.Hsapiens.UCSC.hg38.knownGene)
+library(org.Hs.eg.db)
 library(clusterProfiler)
 
+setwd("D:/RNA_brain/human/Deseq2")
+region <- c("neu_diff_CRBLM_up")
+region <- c("neu_diff_CRBLM_down")
+region <- c("neu_diff_CRBLM")
 
-  setwd("D:/RNA_brain/human/Deseq2")
-  region <- c("HIPP")
-  data <- read.table(paste0("diff_",region,".txt"), header=FALSE)
+
+data <- read.table(paste0(region,".txt"), header=FALSE)
   
   ensembl_id_transform <- function(ENSEMBL_ID) {
-    a = bitr(ENSEMBL_ID, fromType = "ENSEMBL", toType = c("SYMBOL", "ENTREZID"), OrgDb = "org.Mm.eg.db")
+    a = bitr(ENSEMBL_ID, fromType = "ENSEMBL", toType = c("SYMBOL", "ENTREZID"), OrgDb = "org.Hs.eg.db")
     return(a)
+
   }
   region_ensembl_id_transform <- ensembl_id_transform(data$V1)
-  write.csv(ensembl_id_transform(data$V1), file =  paste0("diff_",region,"_ensemblID.tsv"))
+  write.csv(ensembl_id_transform(data$V1), file =  paste0(region,"_ensemblID.tsv"))
 
-  mart <- useDataset("mmusculus_gene_ensembl", useMart("ENSEMBL_MART_ENSEMBL"))
-  region_biomart_ensembl_id_transform <- getBM(
-    attributes = c("ensembl_gene_id", "external_gene_name", "entrezgene_id", "description"),
-    filters = "ensembl_gene_id",
-    values = data$V1,
-    mart = mart
-  )
-  write.csv(region_biomart_ensembl_id_transform, file =  paste0("diff_",region,"_biomartID.tsv"))
-
-  # GO analysis and barplot
-  region_biomart <- enrichGO(
-    gene = region_biomart_ensembl_id_transform$entrezgene_id, 
-    keyType = "ENTREZID",
-    OrgDb = org.Mm.eg.db,
+  region_transform <- enrichGO(
+    gene = data$V1, 
+    keyType = "ENSEMBL",
+    OrgDb = org.Hs.eg.db,
     ont = "BP",
     pAdjustMethod = "BH",
     qvalueCutoff = 0.05,
     readable = TRUE
   )
-  pdf(file = paste0(region, "_biomart.pdf"))
-  barplot(region_biomart, showCategory = 40, font.size = 6, title = paste("The GO BP enrichment analysis", sep = ""))
-  dev.off()
-
+# 两种都可以
   region_transform <- enrichGO(
     gene = region_ensembl_id_transform$ENTREZID, 
     keyType = "ENTREZID",
-    OrgDb = org.Mm.eg.db,
+    OrgDb = org.Hs.eg.db,
     ont = "BP",
     pAdjustMethod = "BH",
     qvalueCutoff = 0.05,
@@ -2410,7 +2369,7 @@ library(clusterProfiler)
 
   region_kegg <- enrichKEGG(
     gene = region_ensembl_id_transform$ENTREZID,
-    organism = 'mmu',
+    organism = 'hsa',
     pvalueCutoff = 0.05,
     pAdjustMethod = "BH"
   )
@@ -2419,33 +2378,384 @@ library(clusterProfiler)
   dev.off()
 ```
 
-* DG 对于其他两个脑区的差异基因
+* PSM和VLPFC没有找到对于其他两个脑区共有的差异基因
+```r
+# neu_diff_PSM_vs_CRBLM_up.txt
+region <- c("neu_diff_VLPFC_vs_CRBLM_down")
+data <- read.table(paste0(region,".txt"), header=FALSE)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+```r
+BiocManager::install("DESeq2")
+library(DESeq2)
+library(pheatmap)
+library(biomaRt)
+library(org.Mm.eg.db)
+library(clusterProfiler)
+library(ggplot2)
+
+# neu
+dataframe <- read.csv("non.csv", header=TRUE, row.names = 1)
+countdata <- dataframe[-(1:5),]
+countdata <- countdata[rowSums(countdata) > 0,]
+head(countdata)
+# 导入coltdata文件
+coldata <- read.table("coldata_non.csv", row.names = 1, header = TRUE, sep = "," ) 
+countdata <- countdata[row.names(coldata)]
+dds <- DESeqDataSetFromMatrix(countData = countdata, colData = coldata, design= ~ treatment)
+dds
+
+
+
+# PCA分析 
+# 归一化
+rld <- rlog(dds, blind=FALSE)
+# intgroup分组
+pcaData <- plotPCA(rld, intgroup=c("treatment"),returnData = T) 
+pcaData <- pcaData[order(pcaData$treatment,decreasing=F),]
+table(pcaData$treatment)
+# PCA1
+plot(pcaData[, 1:2], pch = 19, col = c(rep("red", 4), rep("green", 4), rep("blue", 6)))
+text(pcaData[, 1], pcaData[, 2], row.names(pcaData), cex = 0.75, font = 1)
+legend(0, 0, inset = 0.02, pt.cex = 1.5, legend = c("CRBLM", "PSM", "VLPFC"), col = c("red", "green", "blue"), pch = 19, cex = 0.75, bty = "n")
+# PCA2
+plotPCA(rld, intgroup="treatment") + ylim(-40, 40)+text(pcaData[,1],pcaData[,2],row.names(pcaData),cex=0.5, font = 1)
+# 聚类热图
+library("RColorBrewer")
+gene_data_transform <- assay(rld)
+sampleDists <- dist(t(gene_data_transform))
+sampleDistMatrix <- as.matrix(sampleDists)
+rownames(sampleDistMatrix) <- rld$treatment
+colnames(sampleDistMatrix) <- rld$treatment
+colors <- colorRampPalette(rev(brewer.pal(8, "Blues")) )(255)
+pheatmap(sampleDistMatrix,
+         clustering_distance_rows=sampleDists,
+         clustering_distance_cols=sampleDists,
+         col=colors)
+```
+         
+3. 差异分析，以CRBLM为control
+```r
+dds$treatment <- factor(as.vector(dds$treatment), levels = c("CRBLM","PSM","VLPFC")) 
+dds$treatment
+dds <- DESeq(dds)
+resultsNames(dds) 
+# [1] "Intercept"   "treatment_PSM_vs_CRBLM"   "treatment_VLPFC_vs_CRBLM"
+```
+
+
+
+* PSM_vs_CRBLM
+```r
+result <- results(dds, name="treatment_PSM_vs_CRBLM", pAdjustMethod = "fdr", alpha = 0.05)
+result_order <- result[order(result$pvalue),]
+summary(result_order)
+# out of 51657 with nonzero total read count
+# adjusted p-value < 0.05
+# LFC > 0 (up)       : 514, 1%
+# LFC < 0 (down)     : 975, 1.9%
+# outliers [1]       : 332, 0.64%
+# low counts [2]     : 17954, 35%
+# (mean count < 3)
+
+table(result_order$padj<0.05)
+# FALSE  TRUE 
+# 31882  1489
+diff_gene <- subset(result_order, padj < 0.05 & abs(log2FoldChange) > 1)
+dim(diff_gene)   # 1337    6
+write.csv(diff_gene, file="non_diff_PSM_vs_CRBLM.csv", quote = F)
+```
+
+
+* VLPFC_vs_CRBLM
+```r
+result <- results(dds, name="treatment_VLPFC_vs_CRBLM", pAdjustMethod = "fdr", alpha = 0.05)
+result_order <- result[order(result$pvalue),]
+summary(result_order)
+# out of 51657 with nonzero total read count
+# adjusted p-value < 0.05
+# LFC > 0 (up)       : 707, 1.4%
+# LFC < 0 (down)     : 925, 1.8%
+# outliers [1]       : 332, 0.64%
+# low counts [2]     : 17954, 35%
+# (mean count < 3
+
+table(result_order$padj<0.05)
+# FALSE  TRUE 
+#  31739  1632 
+diff_gene <- subset(result_order, padj < 0.05 & abs(log2FoldChange) > 1)
+dim(diff_gene)   # 11652   6
+write.csv(diff_gene, file="non_diff_VLPFC_vs_CRBLM.csv", quote = F)
+```
+
+
+4. 差异分析，以PSM为control
+```r
+# 其他和前文一致
+dds <- DESeqDataSetFromMatrix(countData = countdata, colData = coldata, design= ~ treatment)
+dds$treatment <- factor(as.vector(dds$treatment), levels = c("PSM","CRBLM","VLPFC")) 
+dds$treatment
+
+dds <- DESeq(dds)
+resultsNames(dds) 
+# [1] "Intercept"              "treatment_CRBLM_vs_PSM"
+# [3] "treatment_VLPFC_vs_PSM"
+```
+
+
+
+* CRBLM_vs_PSM
+```r
+result <- results(dds, name="treatment_CRBLM_vs_PSM", pAdjustMethod = "fdr", alpha = 0.05)
+result_order <- result[order(result$pvalue),]
+summary(result_order) # 和前文HIPP vs DG刚好反过来
+# out of 51657 with nonzero total read count
+# adjusted p-value < 0.05
+# LFC > 0 (up)       : 975, 1.9%
+# LFC < 0 (down)     : 514, 1%
+# outliers [1]       : 332, 0.64%
+# low counts [2]     : 17954, 35%
+# (mean count < 3)
+
+table(result_order$padj<0.05)
+# FALSE  TRUE 
+# 31882  1489
+
+diff_gene <- subset(result_order, padj < 0.05 & abs(log2FoldChange) > 1)
+dim(diff_gene)   #1337    6
+write.csv(diff_gene, file="non_diff_CRBLM_vs_PSM.csv", quote = F)
+```
+
+
+* VLPFC_vs_PSM
+```r
+result <- results(dds, name="treatment_VLPFC_vs_PSM", pAdjustMethod = "fdr", alpha = 0.05)
+result_order <- result[order(result$pvalue),]
+summary(result_order)
+# out of 51657 with nonzero total read count
+# adjusted p-value < 0.05
+# LFC > 0 (up)       : 1, 0.0019%
+# LFC < 0 (down)     : 0, 0%
+# outliers [1]       : 332, 0.64%
+# low counts [2]     : 0, 0%
+# (mean count < 0)
+
+table(result_order$padj<0.05)
+# FALSE  TRUE 
+#  51324     1
+
+diff_gene <- subset(result_order, padj < 0.05 & abs(log2FoldChange) > 1)
+dim(diff_gene)   #1    6
+write.csv(diff_gene, file="non_diff_VLPFC_vs_PSM.csv", quote = F)
+```
+
+5. 差异分析，以VLPFC为control
+```r
+# 其他和前文一致
+dds$treatment <- factor(as.vector(dds$treatment), levels = c("VLPFC","PSM","CRBLM")) 
+dds <- DESeq(dds)
+resultsNames(dds) 
+# [1] "Intercept"                "treatment_PSM_vs_VLPFC"  
+# [3] "treatment_CRBLM_vs_VLPFC"
+```
+
+
+
+* PSM_vs_VLPFC
+```r
+result <- results(dds, name="treatment_PSM_vs_VLPFC", pAdjustMethod = "fdr", alpha = 0.05)
+result_order <- result[order(result$pvalue),]
+summary(result_order) 
+# out of 51657 with nonzero total read count
+# adjusted p-value < 0.05
+# LFC > 0 (up)       : 0, 0%
+# LFC < 0 (down)     : 1, 0.0019%
+# outliers [1]       : 332, 0.64%
+# low counts [2]     : 0, 0%
+# (mean count < 0)
+
+table(result_order$padj<0.05)
+# FALSE  TRUE 
+# 51324     1 
+
+diff_gene <- subset(result_order, padj < 0.05 & abs(log2FoldChange) > 1)
+dim(diff_gene)   #1   6
+write.csv(diff_gene, file="non_diff_PSM_vs_VLPFC.csv", quote = F)
+```
+
+
+* CRBLM_vs_VLPFC
+```r
+result <- results(dds, name="treatment_CRBLM_vs_VLPFC", pAdjustMethod = "fdr", alpha = 0.05)
+result_order <- result[order(result$pvalue),]
+summary(result_order)
+# out of 51657 with nonzero total read count
+# adjusted p-value < 0.05
+# LFC > 0 (up)       : 925, 1.8%
+# LFC < 0 (down)     : 707, 1.4%
+# outliers [1]       : 332, 0.64%
+# low counts [2]     : 17954, 35%
+# (mean count < 3)
+
+table(result_order$padj<0.05)
+# FALSE  TRUE 
+# 31739  1632
+
+diff_gene <- subset(result_order, padj < 0.05 & abs(log2FoldChange) > 1)
+dim(diff_gene)   # 1459    6
+write.csv(diff_gene, file="non_diff_CRBLM_vs_VLPFC.csv", quote = F)
+```
+
+
+4. 脑区差异基因
+
+找到某一脑区对另外两个脑区来说，都差异表达的基因。
+
+```bash
+cd /mnt/d/RNA_brain/human/Deseq2 
+
+# 区分up/down
+for i in non_diff_*.csv
+do
+sed 's/,/\t/g' "$i" | tail -n +2  > "${i%.csv}.txt"
+done
+dos2unix *.txt
+
+for i in non_diff*.txt 
+do
+  echo " ==> $i <== " 
+  tsv-filter --is-numeric 3 --gt 3:0 $i > ${i%%.*}_up.txt
+  tsv-filter --is-numeric 3 --lt 3:0 $i > ${i%%.*}_down.txt
+done
+
+wc -l non*_up.txt
+  #  898 non_diff_CRBLM_vs_PSM_up.txt
+  #  825 non_diff_CRBLM_vs_VLPFC_up.txt
+  #  439 non_diff_PSM_vs_CRBLM_up.txt
+  #    0 non_diff_PSM_vs_VLPFC_up.txt
+  #  634 non_diff_VLPFC_vs_CRBLM_up.txt
+  #    1 non_diff_VLPFC_vs_PSM_up.txt
+
+wc -l non*_down.txt
+  #  439 non_diff_CRBLM_vs_PSM_down.txt
+  #  634 non_diff_CRBLM_vs_VLPFC_down.txt
+  #  898 non_diff_PSM_vs_CRBLM_down.txt
+  #    1 non_diff_PSM_vs_VLPFC_down.txt
+  #  825 non_diff_VLPFC_vs_CRBLM_down.txt
+  #    0 non_diff_VLPFC_vs_PSM_down.txt
+```
+
+* CRBLM对于其他两个脑区的差异基因
 ```bash
 # up
-awk 'NR==FNR {a[$1]=1; next} a[$1]' diff_DG_HIPP_up.txt diff_DG_PFC_up.txt > diff_DG_up.txt # 597
+awk 'NR==FNR {a[$1]=1; next} a[$1]' non_diff_CRBLM_vs_PSM_up.txt non_diff_CRBLM_vs_VLPFC_up.txt > non_diff_CRBLM_up.txt #589
 # down
-awk 'NR==FNR {a[$1]=1; next} a[$1]' diff_DG_HIPP_down.txt diff_DG_PFC_down.txt > diff_DG_down.txt # 1363
+awk 'NR==FNR {a[$1]=1; next} a[$1]' non_diff_CRBLM_vs_PSM_down.txt non_diff_CRBLM_vs_VLPFC_down.txt > non_diff_CRBLM_down.txt # 293
 
-cat diff_DG_up.txt diff_DG_down.txt > diff_DG.txt
+cat non_diff_CRBLM_up.txt non_diff_CRBLM_down.txt > non_diff_CRBLM.txt
 ```
 ```r
-  region <- c("DG")
-  data <- read.table(paste0("diff_",region,".txt"), header=FALSE)
+library(biomaRt)
+library(ChIPseeker)
+library(GenomicFeatures)
+library(TxDb.Hsapiens.UCSC.hg38.knownGene)
+library(org.Hs.eg.db)
+library(clusterProfiler)
+
+setwd("D:/RNA_brain/human/Deseq2")
+region <- c("non_diff_CRBLM_up")
+region <- c("non_diff_CRBLM_down")
+region <- c("non_diff_CRBLM")
+
+
+data <- read.table(paste0(region,".txt"), header=FALSE)
+  
+  ensembl_id_transform <- function(ENSEMBL_ID) {
+    a = bitr(ENSEMBL_ID, fromType = "ENSEMBL", toType = c("SYMBOL", "ENTREZID"), OrgDb = "org.Hs.eg.db")
+    return(a)
+
+  }
+  region_ensembl_id_transform <- ensembl_id_transform(data$V1)
+  write.csv(ensembl_id_transform(data$V1), file =  paste0(region,"_ensemblID.tsv"))
+
+  region_transform <- enrichGO(
+    gene = data$V1, 
+    keyType = "ENSEMBL",
+    OrgDb = org.Hs.eg.db,
+    ont = "BP",
+    pAdjustMethod = "BH",
+    qvalueCutoff = 0.05,
+    readable = TRUE
+  )
+# 两种都可以
+  region_transform <- enrichGO(
+    gene = region_ensembl_id_transform$ENTREZID, 
+    keyType = "ENTREZID",
+    OrgDb = org.Hs.eg.db,
+    ont = "BP",
+    pAdjustMethod = "BH",
+    qvalueCutoff = 0.05,
+    readable = TRUE
+  )
+  pdf(file = paste0(region, "_transform.pdf"))
+  barplot(region_transform, showCategory = 40, font.size = 6, title = paste("The GO BP enrichment analysis", sep = ""))
+  dev.off()
+
+  region_kegg <- enrichKEGG(
+    gene = region_ensembl_id_transform$ENTREZID,
+    organism = 'hsa',
+    pvalueCutoff = 0.05,
+    pAdjustMethod = "BH"
+  )
+  pdf(file = paste0(region, "_kegg.pdf"),width = 80, height = 120)
+  barplot(region_kegg, showCategory = 20, font.size = 120,title = "KEGG Pathway Enrichment Analysis")
+  dev.off()
 ```
 
-* PFC 对于其他两个脑区的差异基因
-```bash
-# up
-awk 'NR==FNR {a[$1]=1; next} a[$1]' diff_PFC_DG_up.txt diff_PFC_HIPP_up.txt > diff_PFC_up.txt # 4070
-# down
-awk 'NR==FNR {a[$1]=1; next} a[$1]' diff_PFC_DG_down.txt diff_PFC_HIPP_down.txt > diff_PFC_down.txt # 4154
-
-cat diff_PFC_up.txt diff_PFC_down.txt > diff_PFC.txt
-```
+* PSMY和VLPFC没有找到对于其他两个脑区共有的差异基因
 ```r
-  region <- c("PFC")
-  data <- read.table(paste0("diff_",region,".txt"), header=FALSE)
+# neu_diff_PSM_vs_CRBLM_up.txt
+region <- c("neu_diff_VLPFC_vs_CRBLM_down")
+data <- read.table(paste0(region,".txt"), header=FALSE)
 ```
-```bash
-cp /mnt/d/RNA_brain/human/Deseq2/* /mnt/xuruizhi/RNA_brain/human/Deseq2
-```
+
+
