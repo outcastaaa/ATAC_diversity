@@ -2050,6 +2050,8 @@ vim coldata_non.csv
 "SRR21161780","WT","non-neuron","CRBLM"
 "SRR21161961","WT","non-neuron","CRBLM"
 ```
+
+### 神经元分析
 ```r
 BiocManager::install("DESeq2")
 library(DESeq2)
@@ -2098,8 +2100,8 @@ pheatmap(sampleDistMatrix,
          clustering_distance_cols=sampleDists,
          col=colors)
 ```
-         
-3. 差异分析，以CRBLM为control
+
+1. 差异分析，以CRBLM为control
 ```r
 dds$treatment <- factor(as.vector(dds$treatment), levels = c("CRBLM","PSM","VLPFC")) 
 dds$treatment
@@ -2154,7 +2156,7 @@ write.csv(diff_gene, file="neu_diff_VLPFC_vs_CRBLM.csv", quote = F)
 ```
 
 
-4. 差异分析，以PSM为control
+2. 差异分析，以PSM为control
 ```r
 # 其他和前文一致
 dds <- DESeqDataSetFromMatrix(countData = countdata, colData = coldata, design= ~ treatment)
@@ -2214,7 +2216,7 @@ dim(diff_gene)   #1    6
 write.csv(diff_gene, file="neu_diff_VLPFC_vs_PSM.csv", quote = F)
 ```
 
-5. 差异分析，以VLPFC为control
+3. 差异分析，以VLPFC为control
 ```r
 # 其他和前文一致
 dds$treatment <- factor(as.vector(dds$treatment), levels = c("VLPFC","PSM","CRBLM")) 
@@ -2344,25 +2346,25 @@ data <- read.table(paste0(region,".txt"), header=FALSE)
   region_ensembl_id_transform <- ensembl_id_transform(data$V1)
   write.csv(ensembl_id_transform(data$V1), file =  paste0(region,"_ensemblID.tsv"))
 
-  # region_transform <- enrichGO(
-  #   gene = data$V1, 
-  #   keyType = "ENSEMBL",
-  #   OrgDb = org.Hs.eg.db,
-  #   ont = "BP",
-  #   pAdjustMethod = "BH",
-  #   qvalueCutoff = 0.05,
-  #   readable = TRUE
-  # )
-# 两种都可以
   region_transform <- enrichGO(
-    gene = region_ensembl_id_transform$ENTREZID, 
-    keyType = "ENTREZID",
+    gene = data$V1, 
+    keyType = "ENSEMBL",
     OrgDb = org.Hs.eg.db,
     ont = "BP",
     pAdjustMethod = "BH",
     qvalueCutoff = 0.05,
     readable = TRUE
   )
+# 两种都可以
+  # region_transform <- enrichGO(
+  #   gene = region_ensembl_id_transform$ENTREZID, 
+  #   keyType = "ENTREZID",
+  #   OrgDb = org.Hs.eg.db,
+  #   ont = "BP",
+  #   pAdjustMethod = "BH",
+  #   qvalueCutoff = 0.05,
+  #   readable = TRUE
+  # )
   pdf(file = paste0(region, "_transform.pdf"))
   barplot(region_transform, showCategory = 40, font.size = 6, title = paste("The GO BP enrichment analysis", sep = ""))
   dev.off()
@@ -2384,46 +2386,7 @@ data <- read.table(paste0(region,".txt"), header=FALSE)
 region <- c("neu_diff_VLPFC_vs_CRBLM_down")
 data <- read.table(paste0(region,".txt"), header=FALSE)
 ```
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+### 非神经元
 ```r
 BiocManager::install("DESeq2")
 library(DESeq2)
@@ -2473,7 +2436,7 @@ pheatmap(sampleDistMatrix,
          col=colors)
 ```
          
-3. 差异分析，以CRBLM为control
+1. 差异分析，以CRBLM为control
 ```r
 dds$treatment <- factor(as.vector(dds$treatment), levels = c("CRBLM","PSM","VLPFC")) 
 dds$treatment
@@ -2528,7 +2491,7 @@ write.csv(diff_gene, file="non_diff_VLPFC_vs_CRBLM.csv", quote = F)
 ```
 
 
-4. 差异分析，以PSM为control
+2. 差异分析，以PSM为control
 ```r
 # 其他和前文一致
 dds <- DESeqDataSetFromMatrix(countData = countdata, colData = coldata, design= ~ treatment)
@@ -2588,7 +2551,7 @@ dim(diff_gene)   #1    6
 write.csv(diff_gene, file="non_diff_VLPFC_vs_PSM.csv", quote = F)
 ```
 
-5. 差异分析，以VLPFC为control
+3. 差异分析，以VLPFC为control
 ```r
 # 其他和前文一致
 dds$treatment <- factor(as.vector(dds$treatment), levels = c("VLPFC","PSM","CRBLM")) 
@@ -2693,63 +2656,6 @@ awk 'NR==FNR {a[$1]=1; next} a[$1]' non_diff_CRBLM_vs_PSM_down.txt non_diff_CRBL
 
 cat non_diff_CRBLM_up.txt non_diff_CRBLM_down.txt > non_diff_CRBLM.txt
 ```
-```r
-library(biomaRt)
-library(ChIPseeker)
-library(GenomicFeatures)
-library(TxDb.Hsapiens.UCSC.hg38.knownGene)
-library(org.Hs.eg.db)
-library(clusterProfiler)
-
-setwd("D:/RNA_brain/human/Deseq2")
-region <- c("non_diff_CRBLM_up")
-region <- c("non_diff_CRBLM_down")
-region <- c("non_diff_CRBLM")
-
-
-data <- read.table(paste0(region,".txt"), header=FALSE)
-  
-  ensembl_id_transform <- function(ENSEMBL_ID) {
-    a = bitr(ENSEMBL_ID, fromType = "ENSEMBL", toType = c("SYMBOL", "ENTREZID"), OrgDb = "org.Hs.eg.db")
-    return(a)
-
-  }
-  region_ensembl_id_transform <- ensembl_id_transform(data$V1)
-  write.csv(ensembl_id_transform(data$V1), file =  paste0(region,"_ensemblID.tsv"))
-
-  region_transform <- enrichGO(
-    gene = data$V1, 
-    keyType = "ENSEMBL",
-    OrgDb = org.Hs.eg.db,
-    ont = "BP",
-    pAdjustMethod = "BH",
-    qvalueCutoff = 0.05,
-    readable = TRUE
-  )
-# 两种都可以
-  # region_transform <- enrichGO(
-  #   gene = region_ensembl_id_transform$ENTREZID, 
-  #   keyType = "ENTREZID",
-  #   OrgDb = org.Hs.eg.db,
-  #   ont = "BP",
-  #   pAdjustMethod = "BH",
-  #   qvalueCutoff = 0.05,
-  #   readable = TRUE
-  # )
-  pdf(file = paste0(region, "_transform.pdf"))
-  barplot(region_transform, showCategory = 40, font.size = 6, title = paste("The GO BP enrichment analysis", sep = ""))
-  dev.off()
-
-  region_kegg <- enrichKEGG(
-    gene = region_ensembl_id_transform$ENTREZID,
-    organism = 'hsa',
-    pvalueCutoff = 0.05,
-    pAdjustMethod = "BH"
-  )
-  pdf(file = paste0(region, "_kegg.pdf"),width = 80, height = 120)
-  barplot(region_kegg, showCategory = 20, font.size = 120,title = "KEGG Pathway Enrichment Analysis")
-  dev.off()
-```
 
 * PSM和VLPFC没有找到对于其他两个脑区共有的差异基因
 ```r
@@ -2790,15 +2696,12 @@ data <- read.table(paste0(region,".txt"), header=FALSE)
 
 
 
-## 12.5 差异表达分析
+## 12.6 找差异基因的第二种方法
 
-1. 数据筛选
+1. Deseq2聚类
 ```bash
-mkdir -p /mnt/xuruizhi/RNA_brain/human/Deseq2
-mkdir -p /mnt/d/RNA_brain/human/Deseq2
-
 cd /mnt/d/RNA_brain/human/Deseq2
-vim 1_neu.list
+vim 1.list
 SRR21161731
 SRR21161739
 SRR21161882
@@ -2813,8 +2716,6 @@ SRR21161743
 SRR21161768
 SRR21161781
 SRR21161962
-
-vim 1_non.list
 SRR21161730
 SRR21161738
 SRR21161881
@@ -2834,88 +2735,18 @@ SRR21161961
 while read -r i
 do
   cp ../HTseq/${i}.count ./
-done < 1_non.list
+done < 1.list
 ```
+* 其他绘图同上
+
 ```r
-rm(list=ls())
-setwd("D:/RNA_brain/human/Deseq2")
 
-files <- list.files(".", "*.count")
-f_lists <- list()
-for(i in files){
-    prefix = gsub("(_\\w+)?\\.count", "", i, perl=TRUE)
-    f_lists[[prefix]] = i
-}
-id_list <- names(f_lists)
-data <- list()
-count <- 0
-for(i in id_list){
-  count <- count + 1
-  a <- read.table(f_lists[[i]], sep="\t", col.names = c("gene_id",i))
-  data[[count]] <- a
-}
-
-data_merge <- data[[1]]
-for(i in seq(2, length(id_list))){
-    data_merge <- merge(data_merge, data[[i]],by="gene_id")
-}
-write.csv(data_merge, "non.csv", quote = FALSE, row.names = FALSE)
-# neu同理
-```
-2. 初步分析
-* coldata
-```bash
-cd /mnt/d/RNA_brain/human/Deseq2 
-vim coldata_neu.csv
-"ids","state","condition","treatment"
-"SRR21161731","WT","neuron","PSM"
-"SRR21161739","WT","neuron","PSM"
-"SRR21161882","WT","neuron","PSM"
-"SRR21161915","WT","neuron","PSM"
-"SRR21161735","WT","neuron","VLPFC"
-"SRR21161751","WT","neuron","VLPFC"
-"SRR21161760","WT","neuron","VLPFC"
-"SRR21161766","WT","neuron","VLPFC"
-"SRR21161910","WT","neuron","VLPFC"
-"SRR21161932","WT","neuron","VLPFC"
-"SRR21161743","WT","neuron","CRBLM"
-"SRR21161768","WT","neuron","CRBLM"
-"SRR21161781","WT","neuron","CRBLM"
-"SRR21161962","WT","neuron","CRBLM"
-
-vim coldata_non.csv
-"ids","state","condition","treatment"
-"SRR21161730","WT","non-neuron","PSM"
-"SRR21161738","WT","non-neuron","PSM"
-"SRR21161881","WT","non-neuron","PSM"
-"SRR21161914","WT","non-neuron","PSM"
-"SRR21161734","WT","non-neuron","VLPFC"
-"SRR21161750","WT","non-neuron","VLPFC"
-"SRR21161759","WT","non-neuron","VLPFC"
-"SRR21161765","WT","non-neuron","VLPFC"
-"SRR21161909","WT","non-neuron","VLPFC"
-"SRR21161931","WT","non-neuron","VLPFC"
-"SRR21161742","WT","non-neuron","CRBLM"
-"SRR21161767","WT","non-neuron","CRBLM"
-"SRR21161780","WT","non-neuron","CRBLM"
-"SRR21161961","WT","non-neuron","CRBLM"
-```
-```r
-BiocManager::install("DESeq2")
-library(DESeq2)
-library(pheatmap)
-library(biomaRt)
-library(org.Mm.eg.db)
-library(clusterProfiler)
-library(ggplot2)
-
-# neu
-dataframe <- read.csv("neu.csv", header=TRUE, row.names = 1)
+dataframe <- read.csv("merge1.csv", header=TRUE, row.names = 1)
 countdata <- dataframe[-(1:5),]
 countdata <- countdata[rowSums(countdata) > 0,]
 head(countdata)
 # 导入coltdata文件
-coldata <- read.table("coldata_neu.csv", row.names = 1, header = TRUE, sep = "," ) 
+coldata <- read.table("coldata.csv", row.names = 1, header = TRUE, sep = "," ) 
 countdata <- countdata[row.names(coldata)]
 dds <- DESeqDataSetFromMatrix(countData = countdata, colData = coldata, design= ~ treatment)
 dds
