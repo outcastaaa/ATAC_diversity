@@ -2344,15 +2344,15 @@ data <- read.table(paste0(region,".txt"), header=FALSE)
   region_ensembl_id_transform <- ensembl_id_transform(data$V1)
   write.csv(ensembl_id_transform(data$V1), file =  paste0(region,"_ensemblID.tsv"))
 
-  region_transform <- enrichGO(
-    gene = data$V1, 
-    keyType = "ENSEMBL",
-    OrgDb = org.Hs.eg.db,
-    ont = "BP",
-    pAdjustMethod = "BH",
-    qvalueCutoff = 0.05,
-    readable = TRUE
-  )
+  # region_transform <- enrichGO(
+  #   gene = data$V1, 
+  #   keyType = "ENSEMBL",
+  #   OrgDb = org.Hs.eg.db,
+  #   ont = "BP",
+  #   pAdjustMethod = "BH",
+  #   qvalueCutoff = 0.05,
+  #   readable = TRUE
+  # )
 # 两种都可以
   region_transform <- enrichGO(
     gene = region_ensembl_id_transform$ENTREZID, 
@@ -2727,15 +2727,15 @@ data <- read.table(paste0(region,".txt"), header=FALSE)
     readable = TRUE
   )
 # 两种都可以
-  region_transform <- enrichGO(
-    gene = region_ensembl_id_transform$ENTREZID, 
-    keyType = "ENTREZID",
-    OrgDb = org.Hs.eg.db,
-    ont = "BP",
-    pAdjustMethod = "BH",
-    qvalueCutoff = 0.05,
-    readable = TRUE
-  )
+  # region_transform <- enrichGO(
+  #   gene = region_ensembl_id_transform$ENTREZID, 
+  #   keyType = "ENTREZID",
+  #   OrgDb = org.Hs.eg.db,
+  #   ont = "BP",
+  #   pAdjustMethod = "BH",
+  #   qvalueCutoff = 0.05,
+  #   readable = TRUE
+  # )
   pdf(file = paste0(region, "_transform.pdf"))
   barplot(region_transform, showCategory = 40, font.size = 6, title = paste("The GO BP enrichment analysis", sep = ""))
   dev.off()
@@ -2751,7 +2751,7 @@ data <- read.table(paste0(region,".txt"), header=FALSE)
   dev.off()
 ```
 
-* PSMY和VLPFC没有找到对于其他两个脑区共有的差异基因
+* PSM和VLPFC没有找到对于其他两个脑区共有的差异基因
 ```r
 # neu_diff_PSM_vs_CRBLM_up.txt
 region <- c("neu_diff_VLPFC_vs_CRBLM_down")
@@ -2759,3 +2759,192 @@ data <- read.table(paste0(region,".txt"), header=FALSE)
 ```
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+## 12.5 差异表达分析
+
+1. 数据筛选
+```bash
+mkdir -p /mnt/xuruizhi/RNA_brain/human/Deseq2
+mkdir -p /mnt/d/RNA_brain/human/Deseq2
+
+cd /mnt/d/RNA_brain/human/Deseq2
+vim 1_neu.list
+SRR21161731
+SRR21161739
+SRR21161882
+SRR21161915
+SRR21161735
+SRR21161751
+SRR21161760
+SRR21161766
+SRR21161910
+SRR21161932
+SRR21161743
+SRR21161768
+SRR21161781
+SRR21161962
+
+vim 1_non.list
+SRR21161730
+SRR21161738
+SRR21161881
+SRR21161914
+SRR21161734
+SRR21161750
+SRR21161759
+SRR21161765
+SRR21161909
+SRR21161931
+SRR21161742
+SRR21161767
+SRR21161780
+SRR21161961
+
+
+while read -r i
+do
+  cp ../HTseq/${i}.count ./
+done < 1_non.list
+```
+```r
+rm(list=ls())
+setwd("D:/RNA_brain/human/Deseq2")
+
+files <- list.files(".", "*.count")
+f_lists <- list()
+for(i in files){
+    prefix = gsub("(_\\w+)?\\.count", "", i, perl=TRUE)
+    f_lists[[prefix]] = i
+}
+id_list <- names(f_lists)
+data <- list()
+count <- 0
+for(i in id_list){
+  count <- count + 1
+  a <- read.table(f_lists[[i]], sep="\t", col.names = c("gene_id",i))
+  data[[count]] <- a
+}
+
+data_merge <- data[[1]]
+for(i in seq(2, length(id_list))){
+    data_merge <- merge(data_merge, data[[i]],by="gene_id")
+}
+write.csv(data_merge, "non.csv", quote = FALSE, row.names = FALSE)
+# neu同理
+```
+2. 初步分析
+* coldata
+```bash
+cd /mnt/d/RNA_brain/human/Deseq2 
+vim coldata_neu.csv
+"ids","state","condition","treatment"
+"SRR21161731","WT","neuron","PSM"
+"SRR21161739","WT","neuron","PSM"
+"SRR21161882","WT","neuron","PSM"
+"SRR21161915","WT","neuron","PSM"
+"SRR21161735","WT","neuron","VLPFC"
+"SRR21161751","WT","neuron","VLPFC"
+"SRR21161760","WT","neuron","VLPFC"
+"SRR21161766","WT","neuron","VLPFC"
+"SRR21161910","WT","neuron","VLPFC"
+"SRR21161932","WT","neuron","VLPFC"
+"SRR21161743","WT","neuron","CRBLM"
+"SRR21161768","WT","neuron","CRBLM"
+"SRR21161781","WT","neuron","CRBLM"
+"SRR21161962","WT","neuron","CRBLM"
+
+vim coldata_non.csv
+"ids","state","condition","treatment"
+"SRR21161730","WT","non-neuron","PSM"
+"SRR21161738","WT","non-neuron","PSM"
+"SRR21161881","WT","non-neuron","PSM"
+"SRR21161914","WT","non-neuron","PSM"
+"SRR21161734","WT","non-neuron","VLPFC"
+"SRR21161750","WT","non-neuron","VLPFC"
+"SRR21161759","WT","non-neuron","VLPFC"
+"SRR21161765","WT","non-neuron","VLPFC"
+"SRR21161909","WT","non-neuron","VLPFC"
+"SRR21161931","WT","non-neuron","VLPFC"
+"SRR21161742","WT","non-neuron","CRBLM"
+"SRR21161767","WT","non-neuron","CRBLM"
+"SRR21161780","WT","non-neuron","CRBLM"
+"SRR21161961","WT","non-neuron","CRBLM"
+```
+```r
+BiocManager::install("DESeq2")
+library(DESeq2)
+library(pheatmap)
+library(biomaRt)
+library(org.Mm.eg.db)
+library(clusterProfiler)
+library(ggplot2)
+
+# neu
+dataframe <- read.csv("neu.csv", header=TRUE, row.names = 1)
+countdata <- dataframe[-(1:5),]
+countdata <- countdata[rowSums(countdata) > 0,]
+head(countdata)
+# 导入coltdata文件
+coldata <- read.table("coldata_neu.csv", row.names = 1, header = TRUE, sep = "," ) 
+countdata <- countdata[row.names(coldata)]
+dds <- DESeqDataSetFromMatrix(countData = countdata, colData = coldata, design= ~ treatment)
+dds
+
+
+
+# PCA分析 
+# 归一化
+rld <- rlog(dds, blind=FALSE)
+# intgroup分组
+pcaData <- plotPCA(rld, intgroup=c("treatment"),returnData = T) 
+pcaData <- pcaData[order(pcaData$treatment,decreasing=F),]
+table(pcaData$treatment)
+# PCA1
+plot(pcaData[, 1:2], pch = 19, col = c(rep("red", 4), rep("green", 4), rep("blue", 6)))
+text(pcaData[, 1], pcaData[, 2], row.names(pcaData), cex = 0.75, font = 1)
+legend(0, 0, inset = 0.02, pt.cex = 1.5, legend = c("CRBLM", "PSM", "VLPFC"), col = c("red", "green", "blue"), pch = 19, cex = 0.75, bty = "n")
+# PCA2
+plotPCA(rld, intgroup="treatment") + ylim(-30, 30)+text(pcaData[,1],pcaData[,2],row.names(pcaData),cex=0.5, font = 1)
+# 聚类热图
+library("RColorBrewer")
+gene_data_transform <- assay(rld)
+sampleDists <- dist(t(gene_data_transform))
+sampleDistMatrix <- as.matrix(sampleDists)
+rownames(sampleDistMatrix) <- rld$treatment
+colnames(sampleDistMatrix) <- rld$treatment
+colors <- colorRampPalette(rev(brewer.pal(8, "Blues")) )(255)
+pheatmap(sampleDistMatrix,
+         clustering_distance_rows=sampleDists,
+         clustering_distance_cols=sampleDists,
+         col=colors)
+```
