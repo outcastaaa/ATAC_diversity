@@ -1545,7 +1545,22 @@ region_peak <- readPeakFile(paste0("D:/ATAC_brain/human/GO_common/", region, "_c
 
 
 
+# Diffbind找差异peak
+```r
+library(DiffBind)
+setwd("D:/ATAC_brain/human")
+samples <- read.csv("./sample_sheet.csv")
+names(samples)
 
+dbObj <- dba(sampleSheet = samples)  
+dbObj
+plot(dbObj)
+
+db_count <- dba.count(dbObj,bUseSummarizeOverlaps=TRUE)
+db_count
+
+plot(db_count)
+```
 
 
 
