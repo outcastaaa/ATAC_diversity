@@ -7,7 +7,6 @@
 1. 样本准备
 ```bash
 cd /mnt/d/RNA_brain/human/Deseq2
-
 # 先用htseq-count计算每个样本的基因raw count数，得到merge1.csv
 while read -r i
 do
@@ -16,7 +15,6 @@ done < 1.list
 ```
 
 2. 初步过滤表达量低的基因
-
 ```r
 library("RColorBrewer")
 setwd("D:/RNA_brain/human/Deseq2")
@@ -24,7 +22,8 @@ dataframe <- read.csv("merge1.csv", header=TRUE, row.names = 1)
 data <- dataframe[-(1:5),]
 data <- data[rowSums(data) > 0,]
 head(data)
-
+```
+```r
 # 导入coltdata文件
 coldata <- read.table("coldata.csv", row.names = 1, header = TRUE, sep = "," ) 
 countdata <- countdata[row.names(coldata)]
@@ -60,7 +59,7 @@ pheatmap(sampleDistMatrix,
 软件：deeptools multiBamSummary，bins是给定bin size在全基因组范围内进行coverage的统计。  
 功能：计算两个以上（含两个）BAM文件的基因组区域的覆盖度。    
 小猪文章bin size定为2kb。  
-
+这种相关性也可以通过基础R算法实现。
 
 1. 统计reads在全基因组范围的情况
 ```bash
