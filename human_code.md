@@ -2719,7 +2719,7 @@ data <- read.table(paste0(region,".txt"), header=FALSE)
 
 
 
-
+!!! 单样本没有去除chrY染色体，会影响聚类
 
 
 
