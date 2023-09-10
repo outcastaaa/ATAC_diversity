@@ -747,6 +747,26 @@ ls ../genebody/*.gz | while read id
 do
   plotHeatmap -m ${id} -out ${id%%.*}_heatmap.png 
 done
+
+
+multiBigwigSummary bins -b *.last.bw -o number.of.bins.npz
+plotCorrelation -in number.of.bins.npz 
+--corMethod pearson 
+--skipZeros 
+--plotTitle "Pearson Correlation of Average Scores Per Transcript" 
+--plotFileFormat pdf 
+--whatToPlot heatmap --colorMap RdYlBu --plotNumbers 
+-o heatmap_PearsonCorr_bigwigScores.pdf 
+--outFileCorMatrix PearsonCorr_bigwigScores.tab
+
+plotCorrelation -in number.of.bins.npz 
+--corMethod pearson 
+--skipZeros 
+--plotTitle "Pearson Correlation of Average Scores Per Transcript" 
+--plotFileFormat pdf 
+--whatToPlot scatterplot 
+-o scatterplot_PearsonCorr_bigwigScores.pdf 
+--outFileCorMatrix PearsonCorr_bigwigScores.tab
 ```
 
 # 9. 寻找rep间consensus peak —— IDR
@@ -1550,7 +1570,6 @@ region_peak <- readPeakFile(paste0("D:/ATAC_brain/human/GO_common/", region, "_c
 library(DiffBind)
 setwd("D:/ATAC_brain/human")
 samples <- read.csv("./sample_sheet.csv")
-names(samples)
 
 dbObj <- dba(sampleSheet = samples)  
 dbObj
@@ -1558,7 +1577,6 @@ plot(dbObj)
 
 db_count <- dba.count(dbObj,bUseSummarizeOverlaps=TRUE)
 db_count
-
 plot(db_count)
 ```
 
@@ -2713,7 +2731,7 @@ data <- read.table(paste0(region,".txt"), header=FALSE)
 
 ## 12.6 找差异基因的第二种方法
 
-1. Deseq2聚类
+1. 采用小猪方法
 ```bash
 cd /mnt/d/RNA_brain/human/Deseq2
 vim 1.list
@@ -2755,11 +2773,14 @@ done < 1.list
 * 其他绘图同上
 
 ```r
-
+# pheatmap绘图
+# 先用htseq-count计算每个样本的基因raw count数，得到merge1.csv
+setwd("D:/RNA_brain/human/Deseq2")
 dataframe <- read.csv("merge1.csv", header=TRUE, row.names = 1)
-countdata <- dataframe[-(1:5),]
-countdata <- countdata[rowSums(countdata) > 0,]
-head(countdata)
+data <- dataframe[-(1:5),]
+data <- data[rowSums(data) > 0,]
+head(data)
+
 # 导入coltdata文件
 coldata <- read.table("coldata.csv", row.names = 1, header = TRUE, sep = "," ) 
 countdata <- countdata[row.names(coldata)]
@@ -2771,16 +2792,7 @@ dds
 # PCA分析 
 # 归一化
 rld <- rlog(dds, blind=FALSE)
-# intgroup分组
-pcaData <- plotPCA(rld, intgroup=c("treatment"),returnData = T) 
-pcaData <- pcaData[order(pcaData$treatment,decreasing=F),]
-table(pcaData$treatment)
-# PCA1
-plot(pcaData[, 1:2], pch = 19, col = c(rep("red", 4), rep("green", 4), rep("blue", 6)))
-text(pcaData[, 1], pcaData[, 2], row.names(pcaData), cex = 0.75, font = 1)
-legend(0, 0, inset = 0.02, pt.cex = 1.5, legend = c("CRBLM", "PSM", "VLPFC"), col = c("red", "green", "blue"), pch = 19, cex = 0.75, bty = "n")
-# PCA2
-plotPCA(rld, intgroup="treatment") + ylim(-30, 30)+text(pcaData[,1],pcaData[,2],row.names(pcaData),cex=0.5, font = 1)
+
 # 聚类热图
 library("RColorBrewer")
 gene_data_transform <- assay(rld)
