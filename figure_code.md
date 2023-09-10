@@ -7,35 +7,6 @@
 1. 样本准备
 ```bash
 cd /mnt/d/RNA_brain/human/Deseq2
-vim 1.list
-SRR21161731
-SRR21161739
-SRR21161882
-SRR21161915
-SRR21161735
-SRR21161751
-SRR21161760
-SRR21161766
-SRR21161910
-SRR21161932
-SRR21161743
-SRR21161768
-SRR21161781
-SRR21161962
-SRR21161730
-SRR21161738
-SRR21161881
-SRR21161914
-SRR21161734
-SRR21161750
-SRR21161759
-SRR21161765
-SRR21161909
-SRR21161931
-SRR21161742
-SRR21161767
-SRR21161780
-SRR21161961
 
 # 先用htseq-count计算每个样本的基因raw count数，得到merge1.csv
 while read -r i
@@ -153,10 +124,12 @@ plotCorrelation -in counts_per_bin.npz \
 --corMethod pearson  #spearman,pearson  \
 --plotTitle "Pearson Correlation of Average Scores Per Bin" \
 --plotFileFormat pdf --whatToPlot heatmap \
---colorMap RdYlBu --plotNumbers \
+--colorMap RdYlBu --plotNumbers --skipZeros \
 -o heatmap_PearsonCorr_bamScores.pdf \
 --outFileCorMatrix PearsonCorr_bamScores.tab
-# --skipZeros
-```
 
+```
+```r
+# 利用计算的correlation值画heatmap图
+```
 ### ATAC-seq
