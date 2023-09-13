@@ -1,22 +1,38 @@
 # Figure 1
 ## F1A 将ATAC-seq、RNA-seq样本聚类
 
-!!! 单样本没有去除chrY染色体，会影响聚类
+!!! 单样本没有去除chrY染色体，可能会影响聚类
 
 ### RNA-seq 
-1. 样本准备
+1. 下载软件
+```bash
+cd /mnt/d/biosoft
+wget https://sourceforge.net/projects/subread/files/subread-2.0.6/subread-2.0.6-Linux-x86_64.tar.gz
+tar -zxvf subread-2.0.6-Linux-x86_64.tar.gz
+cd subread-2.0.6-Linux-x86_64/bin
+chmod +x featureCounts
+/mnt/d/biosoft/subread-2.0.6-Linux-x86_64/bin/featureCounts --help
+```
+2. 样本准备
 ```bash
 # 为了保证样本间更高的相似性，去除Y染色体上的基因统计
-cd /mnt/xuruizhi/RNA_brain/human/annotation
-cat hg38.gtf | grep -v "chrY"  >  hg38_rmchrY.gtf
-wc -l *.gtf
-#   2646896 hg38.gtf
-#   2638316 hg38_rmchrY.gtf
-# 先用htseq-count计算每个样本的基因raw count数，得到merge1.csv
+# 使用TSS.bed文件
+mkdir -p /mnt/xuruizhi/RNA_brain/human/featurecount
+cd /mnt/xuruizhi/RNA_brain/human/featurecount
+cp /mnt/xuruizhi/ATAC_brain/human/TSS/hg38.TSS.bed  ./
+
+cat hg38.TSS.bed | grep -v "chrY"  >  hg38_rmchrY.bed
+wc -l *.bed
+#   274031 hg38.TSS.bed
+#   273010 hg38_rmchrY.bed
+
+# 先用feature count计算每个样本的基因raw count数，得到merge.csv
 cd /mnt/xuruizhi/RNA_brain/human/sort_bam
-mkdir -p /mnt/xuruizhi/RNA_brain/human/HTseq_rmchrY
 parallel -j 2 "
-    htseq-count -s no -r pos -f bam {1}.sort.bam ../annotation/hg38_rmchrY.gtf > ../HTseq_rmchrY/{1}.count  2>../HTseq_rmchrY/{1}.log
+    featureCounts -T 3 -a ../featurecount/hg38_rmchrY.bed -F bed -o ../featurecount/{1}.count {1}.sort.bam 2>../featurecount/{1}.log
+
+    featureCounts -T 10 -a $gtf -o read.count -p -B -C -f -t exon -g gene_id  *.bam
+
 " ::: $(ls *.sort.bam | perl -p -e 's/\.sort\.bam$//')
 
 mkdir -p /mnt/d/RNA_brain/human/HTseq_rmchrY
@@ -180,7 +196,7 @@ plotCorrelation -in counts_per_bin30.npz \
 # 利用计算的correlation值画heatmap图
 ```
 ### ATAC-seq
-
+* 质量值10或者30影响不大
 ```bash
 mkdir -p /mnt/xuruizhi/ATAC_brain/human/Correlation
 cd /mnt/xuruizhi/ATAC_brain/human/final
