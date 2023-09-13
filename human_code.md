@@ -769,6 +769,83 @@ plotCorrelation -in number.of.bins.npz
 --outFileCorMatrix PearsonCorr_bigwigScores.tab
 ```
 
+# 单独样本统计情况
+
+```bash
+mkdir -p /mnt/d/ATAC_brain/human/peak_annotation
+cd /mnt/d/ATAC_brain/human/peaks
+for i in $(ls *_peaks.narrowPeak);do
+echo $i
+cut -f 1,2,3 $i > ../peak_annotation/${i%%.*}.bed
+done
+```
+```r
+setwd("D:/ATAC_brain/human/peaks/annotation")
+library(biomaRt)
+library(ChIPseeker)
+library(GenomicFeatures)
+library(TxDb.Hsapiens.UCSC.hg38.knownGene)
+library(org.Hs.eg.db)
+library(clusterProfiler)
+
+
+regions <- list.files(pattern = "\\d+_peaks\\.bed")
+
+for (region in regions) {
+  region_peak <- readPeakFile(region)
+
+  txdb <- TxDb.Hsapiens.UCSC.hg38.knownGene
+  promoter <- getPromoters(TxDb = txdb, upstream = 1000, downstream = 1000)
+  tagMatrix <- getTagMatrix(region_peak, windows = promoter)
+
+  region_peakAnnolist <- annotatePeak(
+    region_peak,
+    tssRegion = c(-1000, 1000),
+    TxDb = txdb,
+    annoDb = "org.Hs.eg.db"
+  )
+  write.table(
+    as.data.frame(region_peakAnnolist),
+    file = paste0(region, ".annotation.tsv"),
+    sep = "\t",
+    row.names = FALSE,
+    quote = FALSE
+  )
+}
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 # 9. 寻找rep间consensus peak —— IDR
 1. 对单独样本进行整理
 * 见"human数据质量情况.xlsx文件"  

@@ -4,7 +4,7 @@
 !!! 单样本没有去除chrY染色体，可能会影响聚类
 
 ### RNA-seq 
-1. 下载软件
+* 下载软件
 ```bash
 cd /mnt/d/biosoft
 wget https://sourceforge.net/projects/subread/files/subread-2.0.6/subread-2.0.6-Linux-x86_64.tar.gz
@@ -13,7 +13,7 @@ cd subread-2.0.6-Linux-x86_64/bin
 chmod +x featureCounts
 /mnt/d/biosoft/subread-2.0.6-Linux-x86_64/bin/featureCounts --help
 ```
-2. 样本准备
+1. 样本准备
 ```bash
 # 为了保证样本间更高的相似性，去除Y染色体上的基因统计
 # 使用TSS.bed文件
@@ -26,61 +26,162 @@ wc -l *.bed
 #   274031 hg38.TSS.bed
 #   273010 hg38_rmchrY.bed
 
+# gtf文件
+cd /mnt/xuruizhi/RNA_brain/human/annotation
+cat hg38_rmchrY.gtf | tsv-filter --str-eq 3:transcript  > hg38_rmchrY_transcript.gtf
+```
+2. feature count计算每个样本的基因raw count数，太麻烦，使用bedtools coverage试试看，最终用htseq-count
+```bash
 # 先用feature count计算每个样本的基因raw count数，得到merge.csv
 cd /mnt/xuruizhi/RNA_brain/human/sort_bam
 parallel -j 2 "
-    featureCounts -T 3 -a ../featurecount/hg38_rmchrY.bed -F bed -o ../featurecount/{1}.count {1}.sort.bam 2>../featurecount/{1}.log
+    featureCounts -T 4 
+    -a ../featurecount/hg38_rmchrY.bed 
+    -F bed -o ../featurecount/{1}.count {1}.sort.bam 
+    2>../featurecount/{1}.log
 
     featureCounts -T 10 -a $gtf -o read.count -p -B -C -f -t exon -g gene_id  *.bam
-
+-O  Assign reads to all their overlapping meta-features #RNA-seq不用，ATAC-seq可以
 " ::: $(ls *.sort.bam | perl -p -e 's/\.sort\.bam$//')
 
-mkdir -p /mnt/d/RNA_brain/human/HTseq_rmchrY
-mkdir -p /mnt/d/RNA_brain/human/dist
+# bedtools coverage
+mkdir -p /mnt/xuruizhi/RNA_brain/human/coverage
+cd /mnt/xuruizhi/RNA_brain/human/featurecount
+sort -k1,1 -k2,2n hg38_rmchrY.bed > hg38_rmchrY_sort.bed
+cp hg38_rmchrY_sort.bed ../coverage
+cd ../sort_bam
+parallel -j 6 "
+   bedtools coverage -sorted -a ../coverage/hg38_rmchrY_sort.bed -b {1}.sort.bam  -counts  -f 1 > ../coverage/{1}.coverage.txt
+" ::: $(ls *.sort.bam | perl -p -e 's/\.sort\.bam$//')
+
+
+# htseq-count，统计exon
+mkdir -p /mnt/xuruizhi/RNA_brain/human/HTseq_rmchrY_exon
+cd /mnt/xuruizhi/RNA_brain/human/sort_bam
+parallel -j 6 "
+    htseq-count -t exon -s no -r pos -f bam {1}.sort.bam ../annotation/hg38_rmchrY.gtf > ../HTseq_rmchrY_exon/{1}.count  2>../HTseq_rmchrY_exon/{1}.log
+" ::: $(ls *.sort.bam | perl -p -e 's/\.sort\.bam$//')
+
+mkdir -p /mnt/d/RNA_brain/human/HTseq_rmchrY_exon
 ```
-```r
-rm(list=ls())
-setwd("/mnt/d/RNA_brain/human/HTseq_rmchrY")
 
-# 得到文件样本编号
-files <- list.files(".", "*.count")
-f_lists <- list()
-for(i in files){
-    prefix = gsub("(_\\w+)?\\.count", "", i, perl=TRUE)
-    f_lists[[prefix]] = i
-}
-id_list <- names(f_lists)
-data <- list()
-count <- 0
-for(i in id_list){
-  count <- count + 1
-  a <- read.table(f_lists[[i]], sep="\t", col.names = c("gene_id",i))
-  data[[count]] <- a
-}
+2. TPM归一化
+```bash
+# 统计非冗余外显子(EXON)长度之和
+BiocManager::install('GenomicFeatures')
+library(GenomicFeatures)
 
-data_merge <- data[[1]]
-for(i in seq(2, length(id_list))){
-    data_merge <- merge(data_merge, data[[i]],by="gene_id")
-}
+setwd("D:/RNA_brain/human/HTseq_rmchrY_exon")
+txdb <- makeTxDbFromGFF("../annotation/hg38_rmchrY.gtf",format="gtf")
 
-write.csv(data_merge, "merge.csv", quote = FALSE, row.names = FALSE)
+exons_gene <- exonsBy(txdb, by = "gene")
+gene_len <- list()
+for(i in names(exons_gene)){
+    range_info = reduce(exons_gene[[i]])
+    width_info = width(range_info)
+    sum_len    = sum(width_info)
+    gene_len[[i]] = sum_len
+}
+# gene_len <- lapply(exons_gene,function(x){sum(width(reduce(x)))})
+
+class(gene_len)
+length(gene_len)
+
+gene_lengths <- t(as.data.frame(gene_len))
+write.table(gene_lengths , file = "hg38_genelen.tsv", row.names = TRUE, sep="\t", quote = FALSE, col.names = FALSE)
+
+# =========== 计算TPM ============ 
+write.table(count, "TPM_normalize.count", col.names = TRUE, row.names = TRUE, sep="\t", quote = FALSE)
 ```
-2. 归一化
-```r
-library("RColorBrewer")
-setwd("D:/RNA_brain/human/dist")
-dataframe <- read.csv("merge.csv", header=TRUE, row.names = 1)
-data <- dataframe[-(1:5),]
-# 初步过滤表达量低的基因
-data <- data[rowSums(data) > 0,]
-head(data)
-```
-3. correlation和dist
-```r
 
+3. 计算dist
+```r
+setwd("D:/RNA_brain/human/TPM")
+data <- read.csv("./terminal.csv", header=TRUE, row.names = 1)
+log_data <- log10(data+1)
+write.csv(log_data, "TPM_normalize.csv")
+colnames(log_data) <- c("nonPSM","PSM","nonVLPFC","VLPFC","nonPSM","PSM","nonCRBLM","CRBLM","nonVLPFC","VLPFC","nonVLPFC","VLPFC","nonVLPFC","VLPFC","nonCRBLM","CRBLM","nonCRBLM","CRBLM","nonPSM","PSM","nonVLPFC","VLPFC","nonPSM","PSM","nonVLPFC","VLPFC","nonCRBLM","CRBLM")
+
+sampleDists <- dist(t(log_data))
+sampleDistMatrix <- as.matrix(sampleDists)
+colors <- colorRampPalette(rev(brewer.pal(8, "Blues")) )(255)
+
+pheatmap(sampleDistMatrix,
+         clustering_distance_rows=sampleDists,
+         clustering_distance_cols=sampleDists,
+         col=colors)
+```
+
+
+
+
+
+
+4. rld归一化做dist
+
+* coldata
+```bash
+mkdir -p /mnt/xuruizhi/RNA_brain/human/Deseq2_rmchrY_exon
+mkdir -p /mnt/d/RNA_brain/human/Deseq2_rmchrY_exon
+cd /mnt/d/RNA_brain/human/Deseq2_rmchrY_exon
+
+vim coldata.csv
+"ids","state","condition","treatment"
+"SRR21161731","WT","neuron","PSM"
+"SRR21161739","WT","neuron","PSM"
+"SRR21161882","WT","neuron","PSM"
+"SRR21161915","WT","neuron","PSM"
+"SRR21161730","WT","non-neuron","nonPSM"
+"SRR21161738","WT","non-neuron","nonPSM"
+"SRR21161881","WT","non-neuron","nonPSM"
+"SRR21161914","WT","non-neuron","nonPSM"
+"SRR21161735","WT","neuron","VLPFC"
+"SRR21161751","WT","neuron","VLPFC"
+"SRR21161760","WT","neuron","VLPFC"
+"SRR21161766","WT","neuron","VLPFC"
+"SRR21161910","WT","neuron","VLPFC"
+"SRR21161932","WT","neuron","VLPFC"
+"SRR21161734","WT","non-neuron","nonVLPFC"
+"SRR21161750","WT","non-neuron","nonVLPFC"
+"SRR21161759","WT","non-neuron","nonVLPFC"
+"SRR21161765","WT","non-neuron","nonVLPFC"
+"SRR21161909","WT","non-neuron","nonVLPFC"
+"SRR21161931","WT","non-neuron","nonVLPFC"
+"SRR21161743","WT","neuron","CRBLM"
+"SRR21161768","WT","neuron","CRBLM"
+"SRR21161781","WT","neuron","CRBLM"
+"SRR21161962","WT","neuron","CRBLM"
+"SRR21161742","WT","non-neuron","nonCRBLM"
+"SRR21161767","WT","non-neuron","nonCRBLM"
+"SRR21161780","WT","non-neuron","nonCRBLM"
+"SRR21161961","WT","non-neuron","nonCRBLM"
+
+library(DESeq2)
+library(pheatmap)
+library(biomaRt)
+library(org.Mm.eg.db)
+library(clusterProfiler)
+library(ggplot2)
+
+setwd("D:/RNA_brain/human/Deseq2_rmchrY_exon")
+dataframe <- read.csv("../HTseq_rmchrY_exon/merge.csv", header=TRUE, row.names = 1)
+countdata <- dataframe[-(1:5),]
+countdata <- countdata[rowSums(countdata) > 0,]
+head(countdata)
+
+coldata <- read.table("coldata.csv", row.names = 1, header = TRUE, sep = "," ) 
+countdata <- countdata[row.names(coldata)]
+dds <- DESeqDataSetFromMatrix(countData = countdata, colData = coldata, design= ~ treatment)
+dds
+
+
+
+# PCA分析 
+# 归一化
+rld <- rlog(dds, blind=FALSE)
 
 # 聚类热图
-
+library("RColorBrewer")
 gene_data_transform <- assay(rld)
 sampleDists <- dist(t(gene_data_transform))
 sampleDistMatrix <- as.matrix(sampleDists)
@@ -96,7 +197,163 @@ pheatmap(sampleDistMatrix,
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ### ATAC-seq
+
+1. 样本准备
+```bash
+# 为了保证样本间更高的相似性，去除Y染色体上的基因统计
+# gtf文件
+cd /mnt/xuruizhi/RNA_brain/human/annotation
+cat hg38_rmchrY.gtf | tsv-filter --str-eq 3:transcript  > hg38_rmchrY_transcript.gtf
+mkdir -p /mnt/xuruizhi/ATAC_brain/human/annotation
+cp ./hg38_rmchrY_transcript.gtf /mnt/xuruizhi/ATAC_brain/human/annotation/
+# 根据genebody图，做up+3kb,down+1kb,统计reads情况
+awk 'BEGIN{OFS="\t"}{$4=$4-3000; $5=$5+1000; print}' hg38_rmchrY_transcript.gtf > hg38_rmchrY_transcript_adj.gtf
+```
+2. htseq-count
+```bash
+# htseq-count
+mkdir -p /mnt/xuruizhi/ATAC_brain/human/HTseq_rmchrY_transcript
+cd /mnt/xuruizhi/ATAC_brain/human/final
+cat 1_all.list | while read id 
+do
+    htseq-count -n 4 -f bam -r pos --minaqual 30 -t transcript -i gene_id  -s no ${id}.final.bam ../annotation/hg38_rmchrY_transcript.gtf > ../HTseq_rmchrY_transcript/${id}.count  2>../HTseq_rmchrY_transcript/${id}.log
+done
+# --nonunique all 先不考虑两个都比对上的情况
+```
+
+
+
+3. rld归一化做dist —— 结果很不好
+
+* coldata
+```bash
+mkdir -p /mnt/xuruizhi/ATAC_brain/human/Deseq2_rmchrY_transcript
+mkdir -p /mnt/d/ATAC_brain/human/Deseq2_rmchrY_transcript
+cd /mnt/d/ATAC_brain/human/Deseq2_rmchrY_transcript
+
+vim coldata.csv
+"ids","state","condition","treatment"
+"SRR21163181","WT","neuron","PSM"
+"SRR21163187","WT","neuron","PSM"
+"SRR21163294","WT","neuron","PSM"
+"SRR21163180","WT","non-neuron","nonPSM"
+"SRR21163186","WT","non-neuron","nonPSM"
+"SRR21163293","WT","non-neuron","nonPSM"
+"SRR21163185","WT","neuron","VLPFC"
+"SRR21163208","WT","neuron","VLPFC"
+"SRR21163321","WT","neuron","VLPFC"
+"SRR21163338","WT","neuron","VLPFC"
+"SRR21163184","WT","non-neuron","nonVLPFC"
+"SRR21163207","WT","non-neuron","nonVLPFC"
+"SRR21163320","WT","non-neuron","nonVLPFC"
+"SRR21163337","WT","non-neuron","nonVLPFC"
+"SRR21163191","WT","neuron","CRBLM"
+"SRR21163217","WT","neuron","CRBLM"
+"SRR21163366","WT","neuron","CRBLM"
+"SRR21163190","WT","non-neuron","nonCRBLM"
+"SRR21163216","WT","non-neuron","nonCRBLM"
+"SRR21163365","WT","non-neuron","nonCRBLM"
+```
+```r
+library(DESeq2)
+library(pheatmap)
+library(biomaRt)
+library(org.Mm.eg.db)
+library(clusterProfiler)
+library(ggplot2)
+
+setwd("D:/ATAC_brain/human/Deseq2_rmchrY_transcript")
+dataframe <- read.csv("../HTseq_rmchrY_transcript/merge.csv", header=TRUE, row.names = 1)
+countdata <- dataframe[-(1:5),]
+countdata <- countdata[rowSums(countdata) > 0,]
+head(countdata) #39473
+
+coldata <- read.table("coldata.csv", row.names = 1, header = TRUE, sep = "," ) 
+countdata <- countdata[row.names(coldata)]
+dds <- DESeqDataSetFromMatrix(countData = countdata, colData = coldata, design= ~ treatment)
+dds
+
+
+
+# PCA分析 
+# 归一化
+rld <- rlog(dds, blind=FALSE)
+
+# 聚类热图
+library("RColorBrewer")
+gene_data_transform <- assay(rld)
+sampleDists <- dist(t(gene_data_transform))
+sampleDistMatrix <- as.matrix(sampleDists)
+rownames(sampleDistMatrix) <- rld$treatment
+colnames(sampleDistMatrix) <- rld$treatment
+colors <- colorRampPalette(rev(brewer.pal(8, "Blues")) )(255)
+pheatmap(sampleDistMatrix,
+         clustering_distance_rows=sampleDists,
+         clustering_distance_cols=sampleDists,
+         col=colors)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -240,4 +497,36 @@ plotCorrelation -in counts_per_bin30.npz \
 ```
 ```r
 # 利用计算的correlation值画heatmap图
+```
+
+
+## 统计RNA-seq基因表达分布情况
+```bash
+ls *.count | while read id
+do
+cat ${id} | cut -f 2 | head -n -5 > ${id%%.*}.txt
+done
+```
+```r
+setwd("D:/RNA_brain/human/HTseq_rmchrY_exon")
+# 画peak length 直方图
+summary_list <- list()
+file_list <- list.files(path = "./", pattern = "\\d+\\.txt", full.names = TRUE)
+
+for (file in file_list) {
+  data <- read.table(file, encoding = "UTF-8")
+  dim_data <- dim(data)
+  summary_list[[file]] <- dim_data
+
+  # 生成直方图并保存为png文件
+  png(paste0(file, "_hist.png"))
+  # 设置横坐标轴范围，例如从0到最大数据值
+#   xlim_range <- c(0, quantile(data[,1], 0.99))
+  xlim_range <- c(0, 5000)
+  # 设置合适的 breaks 值，根据数据范围和希望的箱子数量进行调整
+  breaks_value <- 1  # 根据需要调整
+  hist(abs(as.numeric(data[,1])), breaks = breaks_value, 
+       xlab = "count", ylab = "Frequency", main = file, xlim = xlim_range)
+  dev.off()
+}
 ```
