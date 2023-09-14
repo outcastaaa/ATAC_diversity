@@ -99,7 +99,8 @@ write.table(count, "TPM_normalize.count", col.names = TRUE, row.names = TRUE, se
 setwd("D:/RNA_brain/human/TPM")
 data <- read.csv("./terminal.csv", header=TRUE, row.names = 1)
 log_data <- log10(data+1)
-write.csv(log_data, "TPM_normalize.csv")
+write.csv(log_data, "logTPM1_normalize")
+
 colnames(log_data) <- c("nonPSM","PSM","nonVLPFC","VLPFC","nonPSM","PSM","nonCRBLM","CRBLM","nonVLPFC","VLPFC","nonVLPFC","VLPFC","nonVLPFC","VLPFC","nonCRBLM","CRBLM","nonCRBLM","CRBLM","nonPSM","PSM","nonVLPFC","VLPFC","nonPSM","PSM","nonVLPFC","VLPFC","nonCRBLM","CRBLM")
 
 sampleDists <- dist(t(log_data))
@@ -110,6 +111,11 @@ pheatmap(sampleDistMatrix,
          clustering_distance_rows=sampleDists,
          clustering_distance_cols=sampleDists,
          col=colors)
+         
+
+# 筛选一下count
+log_data <- log_data[rowSums(log_data) > 0,]  # 55044
+write.csv(log_data, "logTPM1_more0.csv")
 ```
 
 
@@ -529,4 +535,116 @@ for (file in file_list) {
        xlab = "count", ylab = "Frequency", main = file, xlim = xlim_range)
   dev.off()
 }
+```
+
+## ATAC-seq根据（1，0）绘制dist图
+1. 构建矩阵
+```bash
+cd /mnt/d/ATAC_brain/human/peak_annotation
+ls *.annotation.tsv | while read id 
+do
+  cat ${id} | tsv-select --f  "ENSEMBL" -H | grep -v "NA" | grep -v "ENSEMBL" | tsv-summarize --count -g 1 > ${id%%.*}.list
+done
+# peak没有去掉Y染色体的，比对的时候注意
+ls *.annotation.tsv | while read id 
+do
+  cat ${id} | tsv-select --f  "ENSEMBL" -H | grep -v "NA" | grep -v "ENSEMBL" | tsv-summarize --count -g 1 | cut -f 1 > ${id%%.*}.genelist
+done
+
+# 提取gtf中gene list，已经去除chrY
+cd /mnt/d/ATAC_brain/human/annotation
+grep 'gene_name' hg38_rmchrY_transcript.gtf | sed -E 's/.*gene_name "([^"]+)".*/\1/' > hg38_rmchrY_gene.list
+cat hg38_rmchrY_gene.list | tsv-summarize --count -g 1 | cut -f 1 > rmchrY_gene.list  # 63637
+
+# 标注1，0
+cd /mnt/d/ATAC_brain/human/peak_annotation
+dos2unix compare_genelist.sh
+ls *.genelist | while read id 
+do
+  awk 'NR==FNR{a[$0];next} $0 in a{print $0, "1"} !($0 in a){print $0, "0"}' $id ../annotation/rmchrY_gene.list | sed 's/ /\t/g'  > ../dist/${id%%.*}.txt
+done
+
+for file in *"_peaks.txt"; do
+    if [ -f "$file" ]; then
+        new_name="${file/_peaks.txt/.count}"
+        mv "$file" "$new_name"
+        echo "重命名 '$file' 为 '$new_name'"
+    fi
+done
+```
+
+
+2. 整合文件
+```r
+rm(list=ls())
+setwd("D:/ATAC_brain/human/dist")
+
+files <- list.files(".", "*.count")
+f_lists <- list()
+for(i in files){
+    prefix = gsub("(_\\w+)?\\.count", "", i, perl=TRUE)
+    f_lists[[prefix]] = i
+}
+
+id_list <- names(f_lists)
+data <- list()
+count <- 0
+for(i in id_list){
+  count <- count + 1
+  a <- read.table(f_lists[[i]], sep="\t", col.names = c("gene_id",i))
+  data[[count]] <- a
+}
+
+# 合并文件
+data_merge <- data[[1]]
+for(i in seq(2, length(id_list))){
+    data_merge <- merge(data_merge, data[[i]],by="gene_id")
+}
+
+write.csv(data_merge, "merge.csv", quote = FALSE, row.names = FALSE)
+```
+3. 计算dist
+```r
+library("RColorBrewer")
+library(pheatmap)
+setwd("D:/ATAC_brain/human/dist")
+
+data <- read.csv("merge.csv", header = TRUE , row.names=1)
+colnames(data) <- c("nonPSM","PSM","nonVLPFC","VLPFC","nonPSM","PSM","nonCRBLM","CRBLM","nonVLPFC","VLPFC","nonCRBLM","CRBLM","nonPSM","PSM","nonVLPFC","VLPFC","nonVLPFC","VLPFC","nonCRBLM","CRBLM")
+
+sampleDists <- dist(t(data))
+sampleDistMatrix <- as.matrix(sampleDists)
+colors <- colorRampPalette(rev(brewer.pal(8, "Blues")) )(255)
+
+pheatmap(sampleDistMatrix,
+         clustering_distance_rows=sampleDists,
+         clustering_distance_cols=sampleDists,
+         col=colors)
+```
+
+## ATAC-seq进行CPM归一化
+```r
+setwd("D:/ATAC_brain/human/HTseq_rmchrY_transcript")
+data <- read.csv("merge.csv", header = TRUE, row.names = 1)
+raw_data <- data[-(1:5),]
+
+# CPM归一化
+# raw_data 是包含计数数据的数据框，每列代表一个样本，每行代表一个基因
+total_counts <- colSums(raw_data)
+cpm_matrix <- raw_data / total_counts * 1e6
+write.csv(cpm_matrix,"../cpm/cpm_normalize.csv")
+cpm <- log10(cpm_matrix+1)
+write.csv(cpm,"../cpm/logcpm1_normalize.csv")
+cpm <- cpm[rowSums(cpm) > 0,]    # 39473
+
+colnames(cpm) <- c("nonPSM","PSM","nonVLPFC","VLPFC","nonPSM","PSM","nonCRBLM","CRBLM","nonVLPFC","VLPFC","nonCRBLM","CRBLM","nonPSM","PSM","nonVLPFC","VLPFC","nonVLPFC","VLPFC","nonCRBLM","CRBLM")
+
+sampleDists <- dist(t(cpm))
+sampleDistMatrix <- as.matrix(sampleDists)
+colors <- colorRampPalette(rev(brewer.pal(8, "Blues")) )(255)
+
+pheatmap(sampleDistMatrix,
+         clustering_distance_rows=sampleDists,
+         clustering_distance_cols=sampleDists,
+         col=colors)
 ```

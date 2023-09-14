@@ -770,7 +770,7 @@ plotCorrelation -in number.of.bins.npz
 ```
 
 # 单独样本统计情况
-
+1. 统计有peak的样本所在基因情况
 ```bash
 mkdir -p /mnt/d/ATAC_brain/human/peak_annotation
 cd /mnt/d/ATAC_brain/human/peaks
@@ -780,7 +780,7 @@ cut -f 1,2,3 $i > ../peak_annotation/${i%%.*}.bed
 done
 ```
 ```r
-setwd("D:/ATAC_brain/human/peaks/annotation")
+setwd("D:/ATAC_brain/human/peak_annotation")
 library(biomaRt)
 library(ChIPseeker)
 library(GenomicFeatures)
